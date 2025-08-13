@@ -26,7 +26,7 @@ type NavItem = {
   children?: NavItem[];
 };
 
-// The data structure remains the same, correctly nesting Analytics under Reports.
+// The data structure remains the same
 const navItems: NavItem[] = [
   { label: "Dashboard", icon: Home, href: "/" },
   { label: "Users", icon: Users, href: "/userform" },
@@ -65,21 +65,33 @@ interface SidebarProps {
   onMenuClick: () => void;
 }
 
-const NavMenu: React.FC<{ items: NavItem[]; pathname: string; level: number }> = ({ items, pathname, level }) => {
+// REFACTORED: This component is updated for smoother transitions.
+const NavMenu: React.FC<{
+  items: NavItem[];
+  pathname: string;
+  level: number;
+}> = ({ items, pathname, level }) => {
   return (
-    <div className={cn("space-y-1", level > 0 && `pl-4`)}>
+    <div className={cn("space-y-1", level > 0 && "pl-4 py-1")}>
       {items.map((item) => {
         const Icon = item.icon;
         return item.children ? (
-          <Collapsible key={item.label} className="w-full" defaultOpen={isLinkActive(item, pathname)}>
+          <Collapsible
+            key={item.label}
+            className="w-full"
+            defaultOpen={isLinkActive(item, pathname)}
+          >
             <CollapsibleTrigger
               className={cn(
                 "flex items-center justify-between w-full p-2 rounded-md hover:bg-gray-800 transition-colors cursor-pointer",
-                isLinkActive(item, pathname) && !item.children.some(c => c.href === pathname) ? "bg-gray-800" : ""
+                isLinkActive(item, pathname) &&
+                  !item.children.some((c) => c.href === pathname)
+                  ? "bg-gray-800"
+                  : ""
               )}
             >
+              {/* ... trigger content ... */}
               <div className="flex items-center gap-3">
-                {/* UPDATED: Use dot for submenus, main icon for top level */}
                 {level > 0 ? (
                   <span className="flex h-full w-[18px] items-center justify-center">
                     <Circle className="h-1.5 w-1.5 fill-current text-current" />
@@ -91,17 +103,25 @@ const NavMenu: React.FC<{ items: NavItem[]; pathname: string; level: number }> =
               </div>
               <ChevronDown className="h-4 w-4 transition-transform [&[data-state=open]]:rotate-180" />
             </CollapsibleTrigger>
-            <CollapsibleContent className="py-1">
-              <NavMenu items={item.children} pathname={pathname} level={level + 1} />
+
+            <CollapsibleContent>
+              <NavMenu
+                items={item.children}
+                pathname={pathname}
+                level={level + 1}
+              />
             </CollapsibleContent>
           </Collapsible>
         ) : (
+      
           <Link
             key={item.href}
             to={item.href || "#"}
             className={cn(
               "flex items-center gap-3 p-2 rounded-md hover:bg-gray-800 transition-colors text-gray-300 hover:text-white",
-              pathname === item.href ? "bg-gray-700 text-white font-semibold" : ""
+              pathname === item.href
+                ? "bg-gray-700 text-white font-semibold"
+                : ""
             )}
           >
             {level > 0 ? (
@@ -118,7 +138,6 @@ const NavMenu: React.FC<{ items: NavItem[]; pathname: string; level: number }> =
     </div>
   );
 };
-
 
 export default function Sidebar({ isOpen, onMenuClick }: SidebarProps) {
   const location = useLocation();
@@ -144,26 +163,26 @@ export default function Sidebar({ isOpen, onMenuClick }: SidebarProps) {
 
       <nav className="flex flex-col p-2 space-y-1 flex-1">
         {isOpen ? (
-            <NavMenu items={navItems} pathname={location.pathname} level={0} />
+          <NavMenu items={navItems} pathname={location.pathname} level={0} />
         ) : (
-            navItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                    Icon && (
-                        <Link
-                          key={item.label}
-                          to={item.href || '#'}
-                          title={item.label}
-                          className={cn(
-                            "flex items-center justify-center p-3 rounded-md hover:bg-gray-800 transition-colors",
-                            isLinkActive(item, location.pathname) ? "bg-gray-800" : ""
-                          )}
-                        >
-                          <Icon size={18} />
-                        </Link>
-                    )
-                )
-            })
+          navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              Icon && (
+                <Link
+                  key={item.label}
+                  to={item.href || "#"}
+                  title={item.label}
+                  className={cn(
+                    "flex items-center justify-center p-3 rounded-md hover:bg-gray-800 transition-colors",
+                    isLinkActive(item, location.pathname) ? "bg-gray-800" : ""
+                  )}
+                >
+                  <Icon size={18} />
+                </Link>
+              )
+            );
+          })
         )}
       </nav>
     </aside>
