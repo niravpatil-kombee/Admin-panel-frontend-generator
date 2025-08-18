@@ -29,10 +29,9 @@ export function setupFrontendProject(): void {
 
   // Step 2: Install general dependencies
   console.log("📦 Installing app dependencies...");
-  execSync(
-    `npm install axios react-router-dom lucide-react class-variance-authority tailwind-variants react-hook-form zod @hookform/resolvers clsx tailwind-merge`,
-    frontendExecOptions
-  );
+  execSync(`npm install axios react-router-dom lucide-react class-variance-authority tailwind-variants react-hook-form zod @hookform/resolvers clsx tailwind-merge @tanstack/react-table`, frontendExecOptions);
+
+  
 
   // Step 3: Install TailwindCSS v3 (Shadcn compatible)
   console.log("🎨 Installing TailwindCSS and dev dependencies...");
@@ -154,7 +153,7 @@ export function cn(...inputs: ClassValue[]) {
     try {
       console.log("📦 Adding Shadcn UI components...");
       execSync(
-        `npx shadcn@latest add button input label select textarea checkbox radio-group form --yes`,
+        `npx shadcn@latest add button input label select textarea checkbox radio-group form table dropdown-menu collapsible --yes`,
         frontendExecOptions
       );
     } catch (error) {
@@ -176,29 +175,9 @@ export function cn(...inputs: ClassValue[]) {
     if (!fs.existsSync(full)) fs.mkdirSync(full, { recursive: true });
   });
 
-  // Step 8: index.html
-  const indexHtmlPath = path.join(baseDir, "index.html");
-  if (!fs.existsSync(indexHtmlPath)) {
-    fs.writeFileSync(
-      indexHtmlPath,
-      `<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Generated Admin Panel</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>`
-    );
-  }
-
   // Step 9: main.tsx
   const mainTsxPath = path.join(baseDir, "src", "main.tsx");
-  if (!fs.existsSync(mainTsxPath)) {
+  if (fs.existsSync(mainTsxPath)) {
     fs.writeFileSync(
       mainTsxPath,
       `import React from "react";
@@ -214,51 +193,6 @@ createRoot(document.getElementById("root")!).render(
     </BrowserRouter>
   </React.StrictMode>
 );
-`
-    );
-  }
-
-  // Step 10: Routes placeholder
-  //   const routesPath = path.join(baseDir, "src", "routes.tsx");
-  //   if (!fs.existsSync(routesPath)) {
-  //     fs.writeFileSync(
-  //       routesPath,
-  //       `import React from "react";
-  // import { Routes, Route } from "react-router-dom";
-
-  // export default function RoutesFile() {
-  //   return (
-  //     <Routes>
-  //       <Route path="/" element={<div className="p-4">Welcome to Generated Admin Panel</div>} />
-  //     </Routes>
-  //   );
-  // }
-  // `
-  //     );
-  //   }
-
-  // Step 11: App.tsx
-  const appPath = path.join(baseDir, "src", "App.tsx");
-  if (fs.existsSync(appPath)) {
-    fs.writeFileSync(
-      appPath,
-      `import './App.css';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-
-function App() {
-  return (
-    <Router>
-      <Routes>
-       
-
-        {/* Optional: default route */}
-        <Route path="/" element={<h1>Home Page</h1>} />
-      </Routes>
-    </Router>
-  );
-}
-
-export default App;
 `
     );
   }

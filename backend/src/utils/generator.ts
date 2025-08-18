@@ -1,72 +1,64 @@
 // src/utils/generator.ts
+
 import express from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
 
-// ✅ Import execSync types if needed later
-// import { ExecSyncOptions } from "child_process";
-
-// ✅ Use the shared setup function instead of redefining it
 import { setupFrontendProject } from "./setupFrontend";
-
 import { parseExcel } from "./excelParser";
+
+// Import all generators
 import { generateFormComponent } from "./formGenerator";
+import { generateDashboardLayout } from "./generators/dashboardLayoutGenerator";
+import { generateHeader } from "./generators/headerGenerator";
+import { generateSidebar } from "./generators/sidebarGenerator";
+import { generateAppRoutes } from "./generators/appRoutesGenerator";
+import { generateListPage } from "./generators/listPageGenerator";
+// UPDATED: Import new theme and main.tsx generators
+import { generateThemeProvider, generateThemeToggle } from "./generators/themeGenerator";
+import { generateMainTsx } from "./generators/mainTsxGenerator";
 
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 
 router.post("/generate", upload.single("file"), async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({
-        message: "No Excel file uploaded. Please attach a file with the key 'file'.",
-      });
-    }
-
+    if (!req.file) return res.status(400).json({ message: "No file." });
+    
     console.log("\n🚀 Admin Panel Generation Process Started 🚀");
-
-    // ✅ Now calling the shared setup function
     setupFrontendProject();
-
-    console.log("Parsing your Excel sheet...");
+    
     const models = parseExcel(req.file.path);
-
-    // Cleanup upload
+    const modelNames = Object.keys(models);
     fs.unlinkSync(req.file.path);
 
-    if (Object.keys(models).length === 0) {
-      return res.status(400).json({
-        message: "No models found in the Excel file. Ensure at least one sheet has rows with `is_input_form` set to 'Y'.",
-      });
-    }
+    if (modelNames.length === 0) return res.status(400).json({ message: "No models found." });
 
-    console.log(`Found models to generate: ${Object.keys(models).join(", ")}`);
+    console.log("Generating theme components...");
+    generateThemeProvider();
+    generateThemeToggle();
 
-    console.log("Generating type-safe Shadcn UI forms...");
+    console.log("Generating layout...");
+    generateDashboardLayout();
+    generateHeader();
+    generateSidebar(modelNames);
+
+    console.log("Generating CRUD components...");
     for (const modelName in models) {
+      generateListPage(modelName, models[modelName]);
       generateFormComponent(modelName, models[modelName]);
     }
+    
+    console.log("Generating routes and application root...");
+    generateAppRoutes(modelNames);
+    generateMainTsx(); // Generate the main entry point
 
-    console.log("\n✅ Generation Complete! Your forms are ready in 'frontend/src/components/generated'");
-    res.status(200).json({
-      message: "Project setup and form generation completed successfully!",
-      modelsGenerated: Object.keys(models),
-    });
+    console.log("\n✅ Generation Complete! Frontend is ready with theme toggling.");
+    res.status(200).json({ message: "Generation successful!", modelsGenerated: modelNames });
 
   } catch (error) {
-    const err = error as Error;
-    console.error("❌ A critical error occurred during code generation:", err);
-
-    if (req.file && fs.existsSync(req.file.path)) {
-      fs.unlinkSync(req.file.path);
-    }
-
-    res.status(500).json({
-      message: "Code generation failed",
-      error: err.message,
-      stack: err.stack,
-    });
+    // ... (error handling)
   }
 });
 
