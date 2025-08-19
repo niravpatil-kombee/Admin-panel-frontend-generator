@@ -8,11 +8,14 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export function generateAppRoutes(modelNames: string[]): void {
   const appPath = path.join(getBaseDir(), "src", "App.tsx");
 
-  const imports = modelNames.map(name =>
-    // UPDATED: Import the new DataTable component name
-    `import { ${capitalize(name)}Form } from './components/generated/${capitalize(name)}Form';
-import { ${capitalize(name)}DataTable } from './components/generated/${capitalize(name)}DataTable';`
-  ).join("\n");
+  const imports = modelNames.map(name => {
+    const capitalizedName = capitalize(name);
+    const formPath = `./pages/${capitalizedName}/${capitalizedName}Form`;
+    const tablePath = `./pages/${capitalizedName}/${capitalizedName}DataTable`;
+
+    return `import { ${capitalizedName}Form } from '${formPath}';
+import { ${capitalizedName}DataTable } from '${tablePath}';`;
+  }).join("\n");
 
   const routeTags = modelNames.map(name => {
     const lower = name.toLowerCase();
@@ -22,6 +25,7 @@ import { ${capitalize(name)}DataTable } from './components/generated/${capitaliz
         <Route path="/${plural}" element={<${capitalize(name)}DataTable />} /> 
         <Route path="/${lower}/create" element={<${capitalize(name)}Form />} />
         <Route path="/${lower}/edit/:id" element={<${capitalize(name)}Form />} />
+        <Route path="/${lower}/view/:id" element={<${capitalize(name)}Form />} />
     `;
   }).join("\n");
 
@@ -29,18 +33,15 @@ import { ${capitalize(name)}DataTable } from './components/generated/${capitaliz
 import './App.css';
 import { Routes, Route } from 'react-router-dom';
 import DashboardLayout from './components/layout/DashboardLayout';
+import Dashboard from './pages/Dashboard'; // UPDATED: Import the new Dashboard component
 ${imports}
 
 function App() {
   return (
     <Routes>
       <Route path="/" element={<DashboardLayout />}>
-        <Route index element={
-          <div className="text-center p-8">
-            <h1 className="text-4xl font-bold text-slate-800">Welcome to the Dashboard</h1>
-            <p className="text-lg mt-2 text-gray-600">Select a section from the sidebar to begin.</p>
-          </div>
-        } />
+        {/* UPDATED: Set Dashboard as the index route */}
+        <Route index element={<Dashboard />} />
         ${routeTags}
       </Route>
     </Routes>
@@ -50,5 +51,5 @@ function App() {
 export default App;
 `;
   fs.writeFileSync(appPath, content, "utf8");
-  console.log("✅ Updated App.tsx with advanced data table routes.");
+  console.log("✅ Updated App.tsx to use the new Dashboard component.");
 }

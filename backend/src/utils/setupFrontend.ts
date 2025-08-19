@@ -29,9 +29,17 @@ export function setupFrontendProject(): void {
 
   // Step 2: Install general dependencies
   console.log("📦 Installing app dependencies...");
-  execSync(`npm install axios react-router-dom lucide-react class-variance-authority tailwind-variants react-hook-form zod @hookform/resolvers clsx tailwind-merge @tanstack/react-table`, frontendExecOptions);
+  execSync(
+    `npm install axios react-router-dom lucide-react class-variance-authority tailwind-variants react-hook-form zod @hookform/resolvers clsx tailwind-merge @tanstack/react-table`,
+    frontendExecOptions
+  );
 
-  
+  // Remove the app.css default config
+  const appCssPath = path.join(baseDir, "src", "App.css");
+  if (fs.existsSync(appCssPath)) {
+      fs.writeFileSync(appCssPath, ""); // Make the file empty
+      console.log("🧹 Cleaned up default App.css styles.");
+  }
 
   // Step 3: Install TailwindCSS v3 (Shadcn compatible)
   console.log("🎨 Installing TailwindCSS and dev dependencies...");
@@ -48,7 +56,6 @@ export function setupFrontendProject(): void {
   }
 
   // Step 4: Setup alias in tsconfig.json BEFORE running shadcn init
-  // Replace your existing updateTsConfigPaths function with this one:
   const updateTsConfigPaths = (tsconfigFile: string) => {
     const tsconfigPath = path.join(baseDir, tsconfigFile);
 
@@ -153,7 +160,7 @@ export function cn(...inputs: ClassValue[]) {
     try {
       console.log("📦 Adding Shadcn UI components...");
       execSync(
-        `npx shadcn@latest add button input label select textarea checkbox radio-group form table dropdown-menu collapsible --yes`,
+        `npx shadcn@latest add button input label select textarea checkbox radio-group form table dropdown-menu dialog alert-dialog collapsible --yes`,
         frontendExecOptions
       );
     } catch (error) {
@@ -174,28 +181,6 @@ export function cn(...inputs: ClassValue[]) {
     const full = path.join(baseDir, d);
     if (!fs.existsSync(full)) fs.mkdirSync(full, { recursive: true });
   });
-
-  // Step 9: main.tsx
-  const mainTsxPath = path.join(baseDir, "src", "main.tsx");
-  if (fs.existsSync(mainTsxPath)) {
-    fs.writeFileSync(
-      mainTsxPath,
-      `import React from "react";
-import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
-import App from "./App";
-import "./index.css";
-
-createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
-    <BrowserRouter>
-      <App />
-    </BrowserRouter>
-  </React.StrictMode>
-);
-`
-    );
-  }
 
   console.log(
     "✅ Frontend project setup with Tailwind v3 + @tailwindcss/vite + Shadcn UI complete"

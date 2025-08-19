@@ -7,72 +7,55 @@ import { Field } from "../excelParser";
 const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+const sanitizeFieldName = (name: string): string => {
+  return name.replace(/[^a-zA-Z0-9_]/g, '_');
+};
+
+function mapToTsType(zodType: Field['zodType']): string {
+  switch (zodType) {
+    case 'number': return 'number';
+    case 'boolean': return 'boolean';
+    case 'date': return 'string';
+    case 'any': return 'any';
+    default: return 'string';
+  }
+}
+
 export function generateListPage(modelName: string, fields: Field[]): void {
   const componentName = `${capitalize(modelName)}DataTable`;
+  const modelTypeName = capitalize(modelName);
   const singleModel = modelName.toLowerCase();
-  const primaryField = fields[0]?.fieldName || 'id';
+  
+  const primaryDisplayField = fields.find(f => f.fieldName.toLowerCase() === 'name') || fields[1] || fields[0];
+  const primaryFilterKey = sanitizeFieldName(primaryDisplayField.fieldName);
 
-  // The columns definition remains the same.
-  const columnsDefinition = `
-import type { ColumnDef } from "@tanstack/react-table"
-import { Eye, Pencil, Copy, Trash2, ArrowUpDown } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Link } from "react-router-dom"
+  const modelDirName = capitalize(modelName);
+  const outputDir = path.join(getBaseDir(), "src", "pages", modelDirName);
 
-export const columns: ColumnDef<any>[] = [
-  { 
-    id: "select", 
-    header: ({ table }) => <Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)} aria-label="Select all" />, 
-    cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />, 
-    enableSorting: false, 
-    enableHiding: false 
-  },
-  ${fields.slice(0, 8).map(field => `
-  { 
-    accessorKey: "${field.fieldName}", 
-    header: "${field.label}"
-  }`).join(',\n  ')},
-  { 
-    id: "actions",
-    header: "Actions",
-    cell: ({ row }) => (
-      <div className="flex items-center justify-end gap-1">
-        <Button asChild variant="ghost" size="icon" title="View">
-          <Link to={"/${singleModel}/edit/" + row.original.id}>
-            <Eye className="h-4 w-4" />
-            <span className="sr-only">View</span>
-          </Link>
-        </Button>
-        <Button asChild variant="ghost" size="icon" title="Edit">
-          <Link to={"/${singleModel}/edit/" + row.original.id}>
-            <Pencil className="h-4 w-4" />
-            <span className="sr-only">Edit</span>
-          </Link>
-        </Button>
-        <Button variant="ghost" size="icon" title="Copy">
-          <Copy className="h-4 w-4" />
-          <span className="sr-only">Copy</span>
-        </Button>
-        <Button variant="ghost" size="icon" title="Delete" className="text-red-600 hover:text-red-500">
-          <Trash2 className="h-4 w-4" />
-          <span className="sr-only">Delete</span>
-        </Button>
-      </div>
-    )
-  }
-]`;
+  const modelTypeDefinition = `
+export type ${modelTypeName} = {
+  ${fields.slice(0, 9).map(field => {
+    const sanitizedName = sanitizeFieldName(field.fieldName);
+    if (sanitizedName === 'id') {
+      return 'id: number | string;';
+    }
+    return `${sanitizedName}: ${mapToTsType(field.zodType)};`;
+  }).join('\n  ')}
+};`;
 
-  const placeholderData = `
-// TODO: This is placeholder data. Fetch your real data from an API.
-const data = [
-  { id: 1, ${fields.slice(0, 8).map(f => `${f.fieldName}: "Sample ${f.label} 1"`).join(', ')} },
-  { id: 2, ${fields.slice(0, 8).map(f => `${f.fieldName}: "Sample ${f.label} 2"`).join(', ')} },
-  { id: 3, ${fields.slice(0, 8).map(f => `${f.fieldName}: "Sample ${f.label} 3"`).join(', ')} },
-];
-`;
+  const mockData = `
+const mockData: ${modelTypeName}[] = [
+  ${Array.from({ length: 23 }, (_, i) => `{
+    ${fields.slice(0, 9).map(f => {
+      const sanitizedName = sanitizeFieldName(f.fieldName);
+      if (sanitizedName === 'id') {
+        return `id: ${i + 1}`;
+      }
+      return `${sanitizedName}: ${mapToTsType(f.zodType) === 'number' ? i + 10 : `"${capitalize(f.fieldName.replace(/_/g, ' '))} ${i + 1}"`}`;
+    }).join(',\n    ')}
+  }`).join(',\n  ')}
+];`;
 
-  // UPDATED: The component content, specifically the renderCard function, is fixed.
   const componentContent = `
 import * as React from "react"
 import {
@@ -82,175 +65,252 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
+  type ColumnDef,
+  type SortingState,
+  type ColumnFiltersState,
+  type Row,
 } from "@tanstack/react-table"
-import type { SortingState, ColumnFiltersState, Row } from "@tanstack/react-table"
-import { Link } from "react-router-dom"
-import { Plus, FileDown, Upload, ArrowUpDown } from "lucide-react"
+import { ArrowUpDown, Plus, Upload, FileDown, Eye, Pencil, Trash2, ChevronLeft, ChevronRight } from "lucide-react"
 import { Input } from "@/components/ui/input"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { columns } from "./columns" 
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Link } from "react-router-dom"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
-${placeholderData}
+${modelTypeDefinition}
+${mockData}
 
 export function ${componentName}() {
-  const [sorting, setSorting] = React.useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
-  const [rowSelection, setRowSelection] = React.useState({})
+  const [data, setData] = React.useState<${modelTypeName}[]>(mockData);
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [rowSelection, setRowSelection] = React.useState({});
+  const [viewingRow, setViewingRow] = React.useState<${modelTypeName} | null>(null);
+
+  // UPDATED: State for managing the delete confirmation dialog
+  const [isAlertOpen, setIsAlertOpen] = React.useState(false);
+  const [itemToDelete, setItemToDelete] = React.useState<null | number | string | (number | string)[]>(null);
+
+  const handleDeleteRow = (id: number | string) => {
+    setItemToDelete(id);
+    setIsAlertOpen(true);
+  };
+
+  
+  const handleDeleteSelected = () => {
+    const selectedIds = table.getFilteredSelectedRowModel().rows.map(row => row.original.id);
+    setItemToDelete(selectedIds);
+    setIsAlertOpen(true);
+  };
+
+  // UPDATED: Function to perform the actual deletion after confirmation
+  const confirmDelete = () => {
+    if (!itemToDelete) return;
+
+    if (Array.isArray(itemToDelete)) {
+      // Bulk delete
+      const selectedIds = new Set(itemToDelete);
+      setData(currentData => currentData.filter(item => !selectedIds.has(item.id)));
+      table.resetRowSelection();
+    } else {
+      // Single row delete
+      setData(currentData => currentData.filter(item => item.id !== itemToDelete));
+    }
+
+    // Close the dialog and reset state
+    setIsAlertOpen(false);
+    setItemToDelete(null);
+  };
+
+  const columns: ColumnDef<${modelTypeName}>[] = React.useMemo(() => [
+    {
+      id: "select",
+      header: ({ table }) => <Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)} aria-label="Select all" />,
+      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
+      enableSorting: false,
+    },
+    ${fields.slice(0, 8).map(field => `{ 
+      accessorKey: "${sanitizeFieldName(field.fieldName)}", 
+      header: "${field.label}" 
+    }`).join(',\n    ')},
+    {
+      id: "actions",
+      header: () => <div className="text-right">Actions</div>,
+      cell: ({ row }) => (
+        <div className="flex items-center justify-end gap-1">
+          <Button variant="ghost" size="icon" title="View" onClick={() => setViewingRow(row.original)}>
+              <Eye className="h-4 w-4" />
+          </Button>
+          <Button asChild variant="ghost" size="icon" title="Edit">
+              <Link to={\`/${singleModel}/edit/\${row.original.id}\`}>
+                  <Pencil className="h-4 w-4" />
+              </Link>
+          </Button>
+          <Button
+              variant="ghost"
+              size="icon"
+              title="Delete"
+              className="text-red-600 hover:text-red-500"
+              onClick={() => handleDeleteRow(row.original.id)}
+          >
+              <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      ),
+    },
+  ], []);
 
   const table = useReactTable({
     data,
     columns,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
+    onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    onRowSelectionChange: setRowSelection,
     state: { sorting, columnFilters, rowSelection },
-  })
+  });
 
-  // Reusable card renderer for mobile view
-  const renderCard = (row: Row<any>) => (
-    <div key={row.id} className="border bg-card rounded-lg p-4 mb-4 shadow-sm">
-      <div className="flex justify-between items-center mb-4">
-        <div className="font-bold text-lg flex items-center">
-            {/* FIXED: Iterate over the filtered cell to get its context correctly */}
-            {row.getVisibleCells().filter(cell => cell.column.id === 'select').map(cell => (
-              <div key={cell.id} className="mr-3">
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </div>
-            ))}
-            {row.getValue("${primaryField}")}
+  const renderCard = (row: Row<${modelTypeName}>) => (
+    <div key={row.id} className="border rounded-lg p-4 mb-4 bg-card shadow-sm">
+      <div className="flex justify-between items-center mb-3">
+        <div className="font-semibold text-lg flex items-center gap-3">
+          {flexRender(row.getVisibleCells().find(c => c.column.id === "select")!.column.columnDef.cell, row.getVisibleCells().find(c => c.column.id === "select")!.getContext())}
+          {row.getValue("${primaryFilterKey}")}
         </div>
-        <div className="flex items-center">
-            {/* FIXED: Iterate over the filtered cell to get its context correctly */}
-            {row.getVisibleCells().filter(cell => cell.column.id === 'actions').map(cell => (
-              <div key={cell.id}>
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </div>
-            ))}
-        </div>
+        <div>{flexRender(row.getVisibleCells().find(c => c.column.id === "actions")!.column.columnDef.cell, row.getVisibleCells().find(c => c.column.id === "actions")!.getContext())}</div>
       </div>
-      <div className="space-y-3">
-        {row.getVisibleCells()
-          .filter(cell => !['select', 'actions', '${primaryField}'].includes(cell.column.id))
-          .map(cell => (
-            <div key={cell.id} className="flex justify-between text-sm">
-              <div className="text-muted-foreground font-medium">
-                {flexRender(cell.column.columnDef.header, cell.getContext())}
-              </div>
-              <div className="text-right">
-                {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </div>
-            </div>
-          ))}
+      <div className="space-y-2 text-sm">
+        {row.getVisibleCells().filter(c => !["select", "actions", "${primaryFilterKey}"].includes(c.column.id)).map(c => (
+          <div key={c.id} className="flex justify-between"><span className="text-muted-foreground font-medium">{flexRender(c.column.columnDef.header, c.getContext())}</span><span>{flexRender(c.column.columnDef.cell, c.getContext())}</span></div>
+        ))}
       </div>
     </div>
-  )
+  );
+
+  const pageIndex = table.getState().pagination.pageIndex;
+  const pageSize = table.getState().pagination.pageSize;
+  const totalRows = table.getFilteredRowModel().rows.length;
+  const pageStart = pageIndex * pageSize + 1;
+  const pageEnd = Math.min(pageStart + pageSize - 1, totalRows);
 
   return (
-    <div className="w-full bg-card border rounded-xl shadow-sm p-4 md:p-6">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4">
-        <Input
-          placeholder="Filter by ${primaryField}..."
-          value={(table.getColumn("${primaryField}")?.getFilterValue() as string) ?? ""}
-          onChange={(event) => table.getColumn("${primaryField}")?.setFilterValue(event.target.value)}
-          className="w-full md:max-w-sm"
-        />
-        <div className="flex items-center gap-2 self-end md:self-auto">
-          {table.getFilteredSelectedRowModel().rows.length > 0 && (
-            <Button variant="destructive" size="sm">
-              Delete ({table.getFilteredSelectedRowModel().rows.length})
-            </Button>
-          )}
-          <Button variant="outline" size="sm"><Upload className="h-4 w-4 mr-2" />Import</Button>
-          <Button variant="outline" size="sm"><FileDown className="h-4 w-4 mr-2" />Export</Button>
-          <Button asChild size="sm">
-            <Link to="/${singleModel}/create">
-              <Plus className="h-4 w-4 mr-2" />Create New
-            </Link>
-          </Button>
-        </div>
-      </div>
-
-      {/* Table view for desktop with sorting buttons */}
-      <div className="rounded-md border hidden md:block">
-        <Table>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => {
-                  const canSort = header.column.getCanSort();
-                  return (
-                    <TableHead key={header.id}>
-                      {header.isPlaceholder ? null : 
-                        canSort ? (
-                          <Button variant="ghost" onClick={() => header.column.toggleSorting(header.column.getIsSorted() === "asc")}>
-                            {flexRender(header.column.columnDef.header, header.getContext())}
-                            <ArrowUpDown className="ml-2 h-4 w-4" />
-                          </Button>
-                        ) : (
-                          flexRender(header.column.columnDef.header, header.getContext())
-                        )
-                      }
-                    </TableHead>
-                  )
-                })}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">No results.</TableCell>
-              </TableRow>
+    <>
+      <div className="w-full rounded-xl border bg-card shadow-sm p-4 md:p-6">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4">
+          <Input placeholder="Filter by ${primaryDisplayField.label.toLowerCase()}..." value={(table.getColumn("${primaryFilterKey}")?.getFilterValue() as string) ?? ""} onChange={(e) => table.getColumn("${primaryFilterKey}")?.setFilterValue(e.target.value)} className="w-full md:max-w-sm" />
+          {/* UPDATED: Toolbar actions layout */}
+          <div className="flex items-center gap-2">
+            {table.getFilteredSelectedRowModel().rows.length > 0 && (
+                <Button variant="destructive" size="sm" onClick={handleDeleteSelected}>
+                    Delete ({table.getFilteredSelectedRowModel().rows.length})
+                </Button>
             )}
-          </TableBody>
-        </Table>
+            <Button variant="outline" size="sm"><FileDown className="h-4 w-4 mr-2" /> Import</Button>
+            <Button variant="outline" size="sm"><Upload className="h-4 w-4 mr-2" /> Export</Button>
+            <Button asChild size="sm"><Link to="/${singleModel}/create"><Plus className="h-4 w-4 mr-2" /> New</Link></Button>
+          </div>
+        </div>
+
+        <div className="hidden md:block rounded-md border">
+          <Table>
+            <TableHeader>{table.getHeaderGroups().map(hg => (<TableRow key={hg.id}>{hg.headers.map(header => (<TableHead key={header.id}>{header.isPlaceholder ? null : header.column.getCanSort() ? (<Button variant="ghost" onClick={() => header.column.toggleSorting(header.column.getIsSorted() === "asc")}>{flexRender(header.column.columnDef.header, header.getContext())}<ArrowUpDown className="ml-2 h-4 w-4" /></Button>) : (flexRender(header.column.columnDef.header, header.getContext()))}</TableHead>))}</TableRow>))}</TableHeader>
+            <TableBody>{table.getRowModel().rows.length ? (table.getRowModel().rows.map(row => (<TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>{row.getVisibleCells().map(cell => (<TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>))}</TableRow>))) : (<TableRow><TableCell colSpan={columns.length} className="h-24 text-center">No results.</TableCell></TableRow>)}</TableBody>
+          </Table>
+        </div>
+
+        <div className="block md:hidden">{table.getRowModel().rows.length ? (table.getRowModel().rows.map(renderCard)) : (<div className="text-center border rounded-md p-8">No results.</div>)}</div>
+        
+        <div className="flex items-center justify-between space-x-4 py-4">
+          <div className="flex items-center gap-2">
+            <Select value={\`\${pageSize}\`} onValueChange={(value) => table.setPageSize(Number(value))}>
+              <SelectTrigger className="w-[75px]"><SelectValue placeholder={pageSize} /></SelectTrigger>
+              <SelectContent>
+                {[10, 20, 30, 40, 50].map(size => <SelectItem key={size} value={\`\${size}\`}>{size}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <p className="text-sm text-muted-foreground hidden sm:inline-block">Records per page</p>
+          </div>
+
+          <div className="flex-1 text-center text-sm text-muted-foreground">
+            Showing {totalRows > 0 ? pageStart : 0} to {pageEnd} of {totalRows} Results
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}><ChevronLeft className="h-4 w-4" /></Button>
+            
+            {Array.from({ length: table.getPageCount() }, (_, i) => (
+              <Button key={i} variant={pageIndex === i ? "default" : "outline"} size="icon" onClick={() => table.setPageIndex(i)}>
+                {i + 1}
+              </Button>
+            ))}
+
+            <Button variant="outline" size="icon" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}><ChevronRight className="h-4 w-4" /></Button>
+          </div>
+        </div>
       </div>
 
-      {/* Card view for mobile */}
-      <div className="block md:hidden">
-        {table.getRowModel().rows?.length ? (
-          table.getRowModel().rows.map(renderCard)
-        ) : (
-          <div className="text-center p-8 border rounded-md">No results.</div>
-        )}
-      </div>
+     <Dialog open={!!viewingRow} onOpenChange={(isOpen) => !isOpen && setViewingRow(null)}>
+        <DialogContent className="sm:max-w-md p-0">
+            <DialogHeader className="p-6 pb-4">
+                <DialogTitle>${modelTypeName} Details</DialogTitle>
+            </DialogHeader>
+            <div className="border-y">
+                {viewingRow && (
+                <div className="grid auto-rows-min gap-y-4 p-6">
+                    ${fields.slice(0, 9).map(field => {
+                        const sanitizedName = sanitizeFieldName(field.fieldName);
+                        return `
+                    <div className="grid grid-cols-2 items-start gap-x-4">
+                        <span className="text-muted-foreground">${field.label}</span>
+                        <p className="text-foreground font-medium break-words">{String(viewingRow.${sanitizedName} ?? '')}</p>
+                    </div>`;
+                    }).join('')}
+                </div>
+                )}
+            </div>
+            <DialogFooter className="sm:justify-end gap-2 p-6 pt-4">
+                <Button variant="outline" onClick={() => setViewingRow(null)}>Cancel</Button>
+                <Button asChild>
+                <Link to={\`/${singleModel}/edit/\${viewingRow?.id}\`}>
+                    <Pencil className="mr-2 h-4 w-4" /> Edit
+                </Link>
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      <div className="flex items-center justify-between space-x-2 py-4">
-        <div className="flex-1 text-sm text-muted-foreground">
-          {table.getFilteredSelectedRowModel().rows.length} of {table.getFilteredRowModel().rows.length} row(s) selected.
-        </div>
-        <div className="space-x-2">
-          <Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Previous</Button>
-          <Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Next</Button>
-        </div>
-      </div>
-    </div>
+       {/* UPDATED: Add the AlertDialog for delete confirmation */}
+      <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the selected record(s) from the server.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setItemToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Continue</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+    </>
   )
 }
 `;
 
-  const columnsContent = `
-${columnsDefinition}
-`;
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
 
-  const outputDir = path.join(getBaseDir(), "src", "components", "generated");
-  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
-
-  fs.writeFileSync(path.join(outputDir, `${componentName}.tsx`), componentContent, "utf8");
-  fs.writeFileSync(path.join(outputDir, `columns.tsx`), columnsContent, "utf8");
-  
-  console.log(`✅ Generated bug-fixed Data Table for ${modelName}.`);
+  const newFilePath = path.join(outputDir, `${componentName}.tsx`);
+  fs.writeFileSync(newFilePath, componentContent, "utf8");
+  console.log(`✅ Generated Data Table for ${modelName} with updated UI at: ${newFilePath}`);
 }

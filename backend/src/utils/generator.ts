@@ -9,12 +9,14 @@ import { setupFrontendProject } from "./setupFrontend";
 import { parseExcel } from "./excelParser";
 
 // Import all generators
-import { generateFormComponent } from "./formGenerator";
+import { generateFormComponent } from "./generators/formGenerator";
 import { generateDashboardLayout } from "./generators/dashboardLayoutGenerator";
 import { generateHeader } from "./generators/headerGenerator";
 import { generateSidebar } from "./generators/sidebarGenerator";
 import { generateAppRoutes } from "./generators/appRoutesGenerator";
 import { generateListPage } from "./generators/listPageGenerator";
+import { generateDashboard } from "./generators/dashboardGenerator";
+import { generateIndexCss } from "./generators/indexCssGenerator";
 // UPDATED: Import new theme and main.tsx generators
 import { generateThemeProvider, generateThemeToggle } from "./generators/themeGenerator";
 import { generateMainTsx } from "./generators/mainTsxGenerator";
@@ -44,6 +46,9 @@ router.post("/generate", upload.single("file"), async (req, res) => {
     generateHeader();
     generateSidebar(modelNames);
 
+    console.log("Generating dashboard page...");
+    generateDashboard(modelNames);
+
     console.log("Generating CRUD components...");
     for (const modelName in models) {
       generateListPage(modelName, models[modelName]);
@@ -52,6 +57,7 @@ router.post("/generate", upload.single("file"), async (req, res) => {
     
     console.log("Generating routes and application root...");
     generateAppRoutes(modelNames);
+    generateIndexCss();
     generateMainTsx(); // Generate the main entry point
 
     console.log("\n✅ Generation Complete! Frontend is ready with theme toggling.");
