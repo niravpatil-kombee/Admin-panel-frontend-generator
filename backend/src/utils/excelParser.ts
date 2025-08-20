@@ -21,21 +21,29 @@ export interface Field {
   required: boolean;
   options?: string[];
   placeholder?: string;
-  // New properties to control UI behavior
   sortable: boolean;
   hidden: boolean;
   isInListing: boolean;
   isRemoveInEditForm: boolean;
 }
 
+// UPDATED: This function now intelligently removes " Id" from field names ending in "_id".
 function createLabel(fieldName: string): string {
   if (!fieldName) return "";
-  return fieldName
+  
+  let label = fieldName
     .replace(/_/g, " ")
     .replace(/([a-z])([A-Z])/g, "$1 $2")
     .split(" ")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+
+  // If the original field name ends with '_id', remove the trailing ' Id' from the label.
+  if (fieldName.toLowerCase().endsWith('_id')) {
+    label = label.replace(/\s+Id$/, '');
+  }
+
+  return label;
 }
 
 function parseOptionsFromComments(comment: string): string[] | undefined {
@@ -100,7 +108,7 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
           zodType = "number";
         } else if (uiComponent === "switch" || uiComponent === "checkbox") {
           zodType = "boolean";
-        } else if (dbType === "date" || dbType === "datetime" || uiComponent === "datepicker") {
+        } else if (dbType.includes("date") || uiComponent === "datepicker" || uiComponent === "date_picker") {
           zodType = "date";
         } else if (uiComponent === "file_upload") {
           zodType = "any";
@@ -116,7 +124,10 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
           case "tinymce":
           case "textarea": uiType = "textarea"; break;
           case "color_picker": uiType = "color"; break;
-          case "datepicker": uiType = "datepicker"; break;
+          case "datepicker":
+            case "date_picker":
+              uiType = "datepicker";
+              break;
           default: uiType = "input";
         }
 
