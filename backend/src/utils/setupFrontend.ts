@@ -160,7 +160,7 @@ export function cn(...inputs: ClassValue[]) {
     try {
       console.log("📦 Adding Shadcn UI components...");
       execSync(
-        `npx shadcn@latest add button input label select textarea checkbox radio-group form table dropdown-menu dialog alert-dialog collapsible popover calendar switch --yes`,
+        `npx shadcn@latest add button input label select textarea checkbox radio-group form table dropdown-menu dialog alert-dialog collapsible popover calendar switch card --yes`,
         frontendExecOptions
       );
     } catch (error) {

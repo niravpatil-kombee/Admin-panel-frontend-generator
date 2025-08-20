@@ -1,3 +1,4 @@
+// src/utils/generators/formGenerator.ts
 import fs from "fs";
 import path from "path";
 import { Field } from "../excelParser";
@@ -5,21 +6,8 @@ import { Field } from "../excelParser";
 const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function renderFormItem(
-  field: Field,
-  control: string,
-  label: string
-): string {
-  return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
-    <FormItem>
-      <FormLabel>${label}</FormLabel>
-      <FormControl>${control}</FormControl>
-      <FormMessage />
-    </FormItem>
-  )} />`;
-}
-
 function generateFormField(field: Field): string {
+  const commonLabel = `<FormLabel>${field.label}</FormLabel>`;
   let control: string;
 
   switch (field.uiType) {
@@ -28,11 +16,9 @@ function generateFormField(field: Field): string {
       break;
 
     case "select":
-      const selectOptions = field.options
-        ? Array.isArray(field.options) && typeof field.options[0] === 'object'
-          ? field.options.map((opt: any) => `<SelectItem value="${opt.value}">${opt.label}</SelectItem>`).join("\n          ")
-          : field.options.map((opt: string) => `<SelectItem value="${opt}">${opt}</SelectItem>`).join("\n          ")
-        : "";
+      const selectOptions = (field.options || ["Option 1", "Option 2"])
+        .map((opt: string) => `<SelectItem value="${opt.toLowerCase().replace(/\\s+/g, '_')}">${opt}</SelectItem>`)
+        .join("\n          ");
 
       control = `<Select onValueChange={field.onChange} defaultValue={field.value}>
         <FormControl>
@@ -48,20 +34,19 @@ function generateFormField(field: Field): string {
 
     case "checkbox":
       return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
-        <FormItem>
-          <div className="space-y-2"><FormLabel>${field.label}</FormLabel></div>
-          <FormControl>
-            <div className="h-10 flex items-center">
+        <FormItem className="flex items-center gap-x-3 space-y-0 pt-8">
+            <FormControl>
               <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+            </FormControl>
+            <div className="space-y-1 leading-none">
+              ${commonLabel}
             </div>
-          </FormControl>
-          <FormMessage />
         </FormItem>
       )} />`;
 
     case "switch":
       return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
-        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mt-6">
           <div className="space-y-0.5">
             <FormLabel>${field.label}</FormLabel>
           </div>
@@ -72,21 +57,13 @@ function generateFormField(field: Field): string {
       )} />`;
 
     case "radio":
-      const radioOptions = field.options
-        ? Array.isArray(field.options) && typeof field.options[0] === 'object'
-          ? field.options.map((opt: any) => 
+      const radioOptions = (field.options || ["Option A", "Option B"])
+        .map((opt: string) => 
               `<FormItem className="flex items-center space-x-2 space-y-0">
-          <FormControl><RadioGroupItem value="${opt.value}" /></FormControl>
-          <FormLabel className="font-normal">${opt.label}</FormLabel>
-        </FormItem>`
-            ).join("\n        ")
-          : field.options.map((opt: string) => 
-              `<FormItem className="flex items-center space-x-2 space-y-0">
-          <FormControl><RadioGroupItem value="${opt}" /></FormControl>
+          <FormControl><RadioGroupItem value="${opt.toLowerCase().replace(/\\s+/g, '_')}" /></FormControl>
           <FormLabel className="font-normal">${opt}</FormLabel>
         </FormItem>`
-            ).join("\n        ")
-        : "";
+            ).join("\n        ");
 
       control = `<RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4 pt-2">
         ${radioOptions}
@@ -101,15 +78,58 @@ function generateFormField(field: Field): string {
       control = `<Input type="color" {...field} />`;
       break;
 
+    // UPDATED: This now generates the correct Shadcn UI date picker with a calendar pop-up.
     case "datepicker":
-      control = `<Input type="date" placeholder="${field.placeholder}" {...field} />`;
-      break;
+      return `<FormField
+        control={form.control}
+        name="${field.fieldName}"
+        render={({ field }) => (
+          <FormItem className="flex flex-col">
+            <FormLabel>${field.label}</FormLabel>
+            <Popover>
+              <PopoverTrigger asChild>
+                <FormControl>
+                  <Button
+                    variant={"outline"}
+                    className={cn(
+                      "w-full pl-3 text-left font-normal",
+                      !field.value && "text-muted-foreground"
+                    )}
+                  >
+                    {field.value ? (
+                      format(field.value, "PPP")
+                    ) : (
+                      <span>Pick a date</span>
+                    )}
+                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                  </Button>
+                </FormControl>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={field.value}
+                  onSelect={field.onChange}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+            <FormMessage />
+          </FormItem>
+        )}
+      />`;
 
     default:
       control = `<Input placeholder="${field.placeholder}" {...field} />`;
   }
 
-  return renderFormItem(field, control, field.label);
+  return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
+    <FormItem>
+      ${commonLabel}
+      <FormControl>${control}</FormControl>
+      <FormMessage />
+    </FormItem>
+  )} />`;
 }
 
 export function generateFormComponent(modelName: string, fields: Field[]): void {
@@ -117,15 +137,14 @@ export function generateFormComponent(modelName: string, fields: Field[]): void 
   const modelDirName = capitalize(modelName);
   const outputDir = path.join(getBaseDir(), "src", "pages", modelDirName);
 
-  const splitIndex = Math.max(0, fields.length - 3);
-  const mainFields = fields.slice(0, splitIndex);
-  const lastRowFields = fields.slice(splitIndex);
+  const mainFormFields = fields.map(generateFormField).join("\n\n                    ");
 
-  const mainFormFields = mainFields.map(generateFormField).join("\n\n                    ");
-  const lastRowFormFields = lastRowFields.map(generateFormField).join("\n\n                    ");
-
+  // UPDATED: Added all necessary imports for the date picker component.
   const componentContent = `
 import { useForm } from "react-hook-form";
+import { format } from "date-fns";
+import { CalendarIcon } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -134,6 +153,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 
 export function ${componentName}() {
   const form = useForm<any>();
@@ -149,13 +170,10 @@ export function ${componentName}() {
       </div>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 md:p-8 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-8">
             ${mainFormFields}
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            ${lastRowFormFields}
-          </div>
-          <div className="flex justify-center md:justify-end pt-8">
+          <div className="flex justify-end pt-4">
             <Button type="submit" size="lg">Save Changes</Button>
           </div>
         </form>

@@ -53,13 +53,16 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
   const models: Record<string, Field[]> = {};
 
   for (const sheetName of workbook.SheetNames) {
-    const modelName = sheetName.trim();
-    if (!modelName) continue;
-
     const worksheet = workbook.Sheets[sheetName];
-    
-    const range = xlsx.utils.decode_range(worksheet['!ref'] || 'A1');
-    
+
+    // ✅ Get table name from cell B1
+    const tableNameCell = worksheet["B1"];
+    const tableName = tableNameCell ? String(tableNameCell.v).trim() : sheetName;
+
+    if (!tableName) continue;
+
+    const range = xlsx.utils.decode_range(worksheet["!ref"] || "A1");
+
     let hasNoCrudColumn = false;
     for (let col = range.s.c; col <= range.e.c; col++) {
       const cellAddress = xlsx.utils.encode_cell({ r: 0, c: col });
@@ -69,9 +72,9 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
         break;
       }
     }
-    
+
     if (hasNoCrudColumn) {
-      console.log(`⏩ Skipping ${modelName} (found no_crud column)`);
+      console.log(`⏩ Skipping ${tableName} (found no_crud column)`);
       continue;
     }
 
@@ -107,7 +110,8 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
           case "checkbox": uiType = "checkbox"; break;
           case "switch": uiType = "switch"; break;
           case "file_upload": uiType = "file"; break;
-          case "tinymce": case "textarea": uiType = "textarea"; break;
+          case "tinymce":
+          case "textarea": uiType = "textarea"; break;
           case "color_picker": uiType = "color"; break;
           case "datepicker": uiType = "datepicker"; break;
           default: uiType = "input";
@@ -120,15 +124,14 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
           zodType,
           uiType,
           required: row.is_null && String(row.is_null).trim().toUpperCase() === "N",
-          // UPDATED: Options are now parsed from the 'comments' column
-          options: parseOptionsFromComments(String(row.comments || '')),
+          options: parseOptionsFromComments(String(row.comments || "")),
           placeholder: `Enter ${createLabel(fieldName)}...`,
         };
       })
       .filter((f): f is Field => f !== null);
 
     if (fields.length > 0) {
-      models[modelName] = fields;
+      models[tableName] = fields; 
     }
   }
   return models;

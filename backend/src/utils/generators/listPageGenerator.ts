@@ -32,25 +32,26 @@ export function generateListPage(modelName: string, fields: Field[]): void {
   const modelDirName = capitalize(modelName);
   const outputDir = path.join(getBaseDir(), "src", "pages", modelDirName);
 
+  // Use all fields for a complete type definition
   const modelTypeDefinition = `
 export type ${modelTypeName} = {
-  ${fields.slice(0, 9).map(field => {
+  ${fields.map(field => {
     const sanitizedName = sanitizeFieldName(field.fieldName);
-    if (sanitizedName === 'id') {
+    // Ensure id is always present and correctly typed
+    if (sanitizedName.toLowerCase() === 'id') {
       return 'id: number | string;';
     }
     return `${sanitizedName}: ${mapToTsType(field.zodType)};`;
   }).join('\n  ')}
 };`;
 
+  // UPDATED: Logic to ensure 'id' is always included in mock data
   const mockData = `
 const mockData: ${modelTypeName}[] = [
-  ${Array.from({ length: 23 }, (_, i) => `{
-    ${fields.slice(0, 9).map(f => {
+  ${Array.from({ length: 13 }, (_, i) => `{
+    id: ${i + 1},
+    ${fields.filter(f => f.fieldName.toLowerCase() !== 'id').map(f => {
       const sanitizedName = sanitizeFieldName(f.fieldName);
-      if (sanitizedName === 'id') {
-        return `id: ${i + 1}`;
-      }
       return `${sanitizedName}: ${mapToTsType(f.zodType) === 'number' ? i + 10 : `"${capitalize(f.fieldName.replace(/_/g, ' '))} ${i + 1}"`}`;
     }).join(',\n    ')}
   }`).join(',\n  ')}
@@ -90,7 +91,6 @@ export function ${componentName}() {
   const [rowSelection, setRowSelection] = React.useState({});
   const [viewingRow, setViewingRow] = React.useState<${modelTypeName} | null>(null);
 
-  // UPDATED: State for managing the delete confirmation dialog
   const [isAlertOpen, setIsAlertOpen] = React.useState(false);
   const [itemToDelete, setItemToDelete] = React.useState<null | number | string | (number | string)[]>(null);
 
@@ -99,28 +99,23 @@ export function ${componentName}() {
     setIsAlertOpen(true);
   };
 
-  
   const handleDeleteSelected = () => {
     const selectedIds = table.getFilteredSelectedRowModel().rows.map(row => row.original.id);
     setItemToDelete(selectedIds);
     setIsAlertOpen(true);
   };
 
-  // UPDATED: Function to perform the actual deletion after confirmation
   const confirmDelete = () => {
     if (!itemToDelete) return;
 
     if (Array.isArray(itemToDelete)) {
-      // Bulk delete
       const selectedIds = new Set(itemToDelete);
       setData(currentData => currentData.filter(item => !selectedIds.has(item.id)));
       table.resetRowSelection();
     } else {
-      // Single row delete
       setData(currentData => currentData.filter(item => item.id !== itemToDelete));
     }
 
-    // Close the dialog and reset state
     setIsAlertOpen(false);
     setItemToDelete(null);
   };
@@ -132,7 +127,11 @@ export function ${componentName}() {
       cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
       enableSorting: false,
     },
-    ${fields.slice(0, 8).map(field => `{ 
+    { 
+      accessorKey: "id", 
+      header: "ID" 
+    },
+    ${fields.filter(f => f.fieldName.toLowerCase() !== 'id').slice(0, 7).map(field => `{ 
       accessorKey: "${sanitizeFieldName(field.fieldName)}", 
       header: "${field.label}" 
     }`).join(',\n    ')},
@@ -204,7 +203,6 @@ export function ${componentName}() {
       <div className="w-full rounded-xl border bg-card shadow-sm p-4 md:p-6">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4">
           <Input placeholder="Filter by ${primaryDisplayField.label.toLowerCase()}..." value={(table.getColumn("${primaryFilterKey}")?.getFilterValue() as string) ?? ""} onChange={(e) => table.getColumn("${primaryFilterKey}")?.setFilterValue(e.target.value)} className="w-full md:max-w-sm" />
-          {/* UPDATED: Toolbar actions layout */}
           <div className="flex items-center gap-2">
             {table.getFilteredSelectedRowModel().rows.length > 0 && (
                 <Button variant="destructive" size="sm" onClick={handleDeleteSelected}>
@@ -263,7 +261,8 @@ export function ${componentName}() {
             <div className="border-y">
                 {viewingRow && (
                 <div className="grid auto-rows-min gap-y-4 p-6">
-                    ${fields.slice(0, 9).map(field => {
+                    {/* Use all fields for a complete view */}
+                    ${fields.map(field => {
                         const sanitizedName = sanitizeFieldName(field.fieldName);
                         return `
                     <div className="grid grid-cols-2 items-start gap-x-4">
@@ -285,7 +284,6 @@ export function ${componentName}() {
         </DialogContent>
       </Dialog>
 
-       {/* UPDATED: Add the AlertDialog for delete confirmation */}
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

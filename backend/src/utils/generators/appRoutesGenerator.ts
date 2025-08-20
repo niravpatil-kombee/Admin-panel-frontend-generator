@@ -33,12 +33,18 @@ import { ${capitalizedName}DataTable } from '${tablePath}';`;
 import './App.css';
 import { Routes, Route } from 'react-router-dom';
 import DashboardLayout from './components/layout/DashboardLayout';
-import Dashboard from './components/Dashboard'; // UPDATED: Import the new Dashboard component
+import Dashboard from './components/Dashboard'; 
+import { LoginPage } from './pages/Auth/LoginPage';
 ${imports}
 
 function App() {
   return (
     <Routes>
+
+     {/* Auth routes are rendered outside the main dashboard layout */}
+      <Route path="/login" element={<LoginPage />} />
+
+       {/* Main application routes are protected by the DashboardLayout */}
       <Route path="/" element={<DashboardLayout />}>
         {/* UPDATED: Set Dashboard as the index route */}
         <Route index element={<Dashboard />} />
