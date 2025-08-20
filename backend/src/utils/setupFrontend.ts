@@ -30,7 +30,7 @@ export function setupFrontendProject(): void {
   // Step 2: Install general dependencies
   console.log("📦 Installing app dependencies...");
   execSync(
-    `npm install axios react-router-dom lucide-react class-variance-authority tailwind-variants react-hook-form zod @hookform/resolvers clsx tailwind-merge @tanstack/react-table`,
+    `npm install axios react-router-dom lucide-react class-variance-authority tailwind-variants react-hook-form zod @hookform/resolvers clsx tailwind-merge @tanstack/react-table date-fns`,
     frontendExecOptions
   );
 
@@ -160,7 +160,7 @@ export function cn(...inputs: ClassValue[]) {
     try {
       console.log("📦 Adding Shadcn UI components...");
       execSync(
-        `npx shadcn@latest add button input label select textarea checkbox radio-group form table dropdown-menu dialog alert-dialog collapsible --yes`,
+        `npx shadcn@latest add button input label select textarea checkbox radio-group form table dropdown-menu dialog alert-dialog collapsible popover calendar switch --yes`,
         frontendExecOptions
       );
     } catch (error) {
