@@ -39,7 +39,7 @@ const getIconForModel = (modelName: string): string => {
 };
 
 export function generateDashboard(modelNames: string[]): void {
-  const pagesDir = path.join(getBaseDir(), "src", "pages");
+  const pagesDir = path.join(getBaseDir(), "src", "components");
   if (!fs.existsSync(pagesDir)) {
     fs.mkdirSync(pagesDir, { recursive: true });
   }

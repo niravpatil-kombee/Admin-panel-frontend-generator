@@ -33,7 +33,7 @@ import { ${capitalizedName}DataTable } from '${tablePath}';`;
 import './App.css';
 import { Routes, Route } from 'react-router-dom';
 import DashboardLayout from './components/layout/DashboardLayout';
-import Dashboard from './pages/Dashboard'; // UPDATED: Import the new Dashboard component
+import Dashboard from './components/Dashboard'; // UPDATED: Import the new Dashboard component
 ${imports}
 
 function App() {

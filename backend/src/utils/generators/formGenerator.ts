@@ -28,6 +28,12 @@ function generateFormField(field: Field): string {
       break;
 
     case "select":
+      const selectOptions = field.options
+        ? Array.isArray(field.options) && typeof field.options[0] === 'object'
+          ? field.options.map((opt: any) => `<SelectItem value="${opt.value}">${opt.label}</SelectItem>`).join("\n          ")
+          : field.options.map((opt: string) => `<SelectItem value="${opt}">${opt}</SelectItem>`).join("\n          ")
+        : "";
+
       control = `<Select onValueChange={field.onChange} defaultValue={field.value}>
         <FormControl>
           <SelectTrigger className="w-full">
@@ -35,11 +41,7 @@ function generateFormField(field: Field): string {
           </SelectTrigger>
         </FormControl>
         <SelectContent>
-          ${
-            field.options
-              ?.map((opt) => `<SelectItem value="${opt}">${opt}</SelectItem>`)
-              .join("\n") || ""
-          }
+          ${selectOptions}
         </SelectContent>
       </Select>`;
       break;
@@ -70,17 +72,24 @@ function generateFormField(field: Field): string {
       )} />`;
 
     case "radio":
-      control = `<RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4 pt-2">
-        ${
-          field.options
-            ?.map(
-              (opt) => `<FormItem className="flex items-center space-x-2 space-y-0">
+      const radioOptions = field.options
+        ? Array.isArray(field.options) && typeof field.options[0] === 'object'
+          ? field.options.map((opt: any) => 
+              `<FormItem className="flex items-center space-x-2 space-y-0">
+          <FormControl><RadioGroupItem value="${opt.value}" /></FormControl>
+          <FormLabel className="font-normal">${opt.label}</FormLabel>
+        </FormItem>`
+            ).join("\n        ")
+          : field.options.map((opt: string) => 
+              `<FormItem className="flex items-center space-x-2 space-y-0">
           <FormControl><RadioGroupItem value="${opt}" /></FormControl>
           <FormLabel className="font-normal">${opt}</FormLabel>
         </FormItem>`
-            )
-            .join("\n") || ""
-        }
+            ).join("\n        ")
+        : "";
+
+      control = `<RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4 pt-2">
+        ${radioOptions}
       </RadioGroup>`;
       break;
 

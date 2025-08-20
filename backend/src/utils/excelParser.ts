@@ -1,3 +1,4 @@
+// src/utils/excelParser.ts
 import xlsx from "xlsx";
 import fs from "fs";
 
@@ -31,6 +32,19 @@ function createLabel(fieldName: string): string {
     .join(" ");
 }
 
+// NEW: Helper function to parse key-value options from the comments column
+function parseOptionsFromComments(comment: string): string[] | undefined {
+  if (!comment || !comment.includes('=>')) return undefined;
+  // This regex finds the text after "=>" and before the next comma or end of string
+  const optionRegex = /=>\s*([^,]+)/g;
+  const options: string[] = [];
+  let match;
+  while ((match = optionRegex.exec(comment)) !== null) {
+    options.push(match[1].trim());
+  }
+  return options.length > 0 ? options : undefined;
+}
+
 export function parseExcel(filePath: string): Record<string, Field[]> {
   if (!fs.existsSync(filePath)) {
     throw new Error(`File not found at path: ${filePath}`);
@@ -44,10 +58,8 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
 
     const worksheet = workbook.Sheets[sheetName];
     
-    // Get the range of the worksheet
     const range = xlsx.utils.decode_range(worksheet['!ref'] || 'A1');
     
-    // Check if "no_crud" column exists by looking at the first row (headers)
     let hasNoCrudColumn = false;
     for (let col = range.s.c; col <= range.e.c; col++) {
       const cellAddress = xlsx.utils.encode_cell({ r: 0, c: col });
@@ -63,7 +75,6 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
       continue;
     }
 
-    // Get data rows (starting from row 2, which is index 1)
     const rawRows = xlsx.utils.sheet_to_json<any>(worksheet, { range: 1 });
 
     if (!rawRows || rawRows.length === 0) continue;
@@ -76,58 +87,30 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
 
         if (!uiComponent) return null;
 
-        // --- Zod type mapping ---
         let zodType: Field["zodType"] = "string";
         const dbType = String(row.type || "").toLowerCase();
 
-        if (
-          dbType.includes("int") ||
-          dbType === "decimal" ||
-          dbType === "double"
-        ) {
+        if (dbType.includes("int") || dbType === "decimal" || dbType === "double") {
           zodType = "number";
         } else if (uiComponent === "switch" || uiComponent === "checkbox") {
           zodType = "boolean";
-        } else if (
-          dbType === "date" ||
-          dbType === "datetime" ||
-          uiComponent === "datepicker"
-        ) {
+        } else if (dbType === "date" || dbType === "datetime" || uiComponent === "datepicker") {
           zodType = "date";
         } else if (uiComponent === "file_upload") {
           zodType = "any";
         }
 
-        // --- UI type mapping ---
         let uiType: Field["uiType"] = "input";
         switch (uiComponent) {
-          case "dropdown":
-            uiType = "select";
-            break;
-          case "radio":
-            uiType = "radio";
-            break;
-          case "checkbox":
-            uiType = "checkbox";
-            break;
-          case "switch":
-            uiType = "switch";
-            break;
-          case "file_upload":
-            uiType = "file";
-            break;
-          case "tinymce":
-          case "textarea":
-            uiType = "textarea";
-            break;
-          case "color_picker":
-            uiType = "color";
-            break;
-          case "datepicker":
-            uiType = "datepicker";
-            break;
-          default:
-            uiType = "input";
+          case "dropdown": uiType = "select"; break;
+          case "radio": uiType = "radio"; break;
+          case "checkbox": uiType = "checkbox"; break;
+          case "switch": uiType = "switch"; break;
+          case "file_upload": uiType = "file"; break;
+          case "tinymce": case "textarea": uiType = "textarea"; break;
+          case "color_picker": uiType = "color"; break;
+          case "datepicker": uiType = "datepicker"; break;
+          default: uiType = "input";
         }
 
         return {
@@ -136,13 +119,9 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
           dataType: dbType,
           zodType,
           uiType,
-          required:
-            row.is_null && String(row.is_null).trim().toUpperCase() === "N",
-          options: row.options
-            ? String(row.options)
-                .split(",")
-                .map((o: string) => o.trim())
-            : undefined,
+          required: row.is_null && String(row.is_null).trim().toUpperCase() === "N",
+          // UPDATED: Options are now parsed from the 'comments' column
+          options: parseOptionsFromComments(String(row.comments || '')),
           placeholder: `Enter ${createLabel(fieldName)}...`,
         };
       })

@@ -16,7 +16,7 @@ export function generateSidebar(modelNames: string[]): void {
       icon: "Users",
       children: [
         {
-          label: `All ${capitalize(name)}s`,
+          label: `All ${capitalize(name)}`,
           href: `/${name.toLowerCase()}s`,
         },
         {
