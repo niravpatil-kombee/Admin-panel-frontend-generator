@@ -2,6 +2,7 @@
 import xlsx from "xlsx";
 import fs from "fs";
 
+// UPDATED: The Field interface now includes the new metadata flags.
 export interface Field {
   fieldName: string;
   label: string;
@@ -20,6 +21,11 @@ export interface Field {
   required: boolean;
   options?: string[];
   placeholder?: string;
+  // New properties to control UI behavior
+  sortable: boolean;
+  hidden: boolean;
+  isInListing: boolean;
+  isRemoveInEditForm: boolean;
 }
 
 function createLabel(fieldName: string): string {
@@ -32,10 +38,8 @@ function createLabel(fieldName: string): string {
     .join(" ");
 }
 
-// NEW: Helper function to parse key-value options from the comments column
 function parseOptionsFromComments(comment: string): string[] | undefined {
   if (!comment || !comment.includes('=>')) return undefined;
-  // This regex finds the text after "=>" and before the next comma or end of string
   const optionRegex = /=>\s*([^,]+)/g;
   const options: string[] = [];
   let match;
@@ -55,7 +59,6 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
   for (const sheetName of workbook.SheetNames) {
     const worksheet = workbook.Sheets[sheetName];
 
-    // ✅ Get table name from cell B1
     const tableNameCell = worksheet["B1"];
     const tableName = tableNameCell ? String(tableNameCell.v).trim() : sheetName;
 
@@ -117,15 +120,21 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
           default: uiType = "input";
         }
 
+        // UPDATED: Parsing logic for the new metadata columns is added here.
+        // It converts a 'Y' from the Excel sheet into a true boolean value.
         return {
           fieldName,
           label: createLabel(fieldName),
           dataType: dbType,
           zodType,
           uiType,
-          required: row.is_null && String(row.is_null).trim().toUpperCase() === "N",
+          required: String(row.is_null || "").trim().toUpperCase() === "N",
           options: parseOptionsFromComments(String(row.comments || "")),
           placeholder: `Enter ${createLabel(fieldName)}...`,
+          sortable: String(row.sortable || "").trim().toUpperCase() === "Y",
+          hidden: String(row.hidden || "").trim().toUpperCase() === "Y",
+          isInListing: String(row.is_in_listing || "").trim().toUpperCase() === "Y",
+          isRemoveInEditForm: String(row.is_remove_in_edit_form || "").trim().toUpperCase() === "Y",
         };
       })
       .filter((f): f is Field => f !== null);

@@ -16,7 +16,7 @@ function generateFormField(field: Field): string {
       break;
 
     case "select":
-      const selectOptions = (field.options || ["Option 1", "Option 2"])
+      const selectOptions = (field.options || ["Default Option 1", "Default Option 2"])
         .map((opt: string) => `<SelectItem value="${opt.toLowerCase().replace(/\\s+/g, '_')}">${opt}</SelectItem>`)
         .join("\n          ");
 
@@ -57,7 +57,7 @@ function generateFormField(field: Field): string {
       )} />`;
 
     case "radio":
-      const radioOptions = (field.options || ["Option A", "Option B"])
+      const radioOptions = (field.options || ["Default A", "Default B"])
         .map((opt: string) => 
               `<FormItem className="flex items-center space-x-2 space-y-0">
           <FormControl><RadioGroupItem value="${opt.toLowerCase().replace(/\\s+/g, '_')}" /></FormControl>
@@ -71,14 +71,13 @@ function generateFormField(field: Field): string {
       break;
 
     case "file":
-      control = `<Input type="file" {...field} />`;
+      control = `<Input type="file" />`; // Simplified for basic form
       break;
 
     case "color":
       control = `<Input type="color" {...field} />`;
       break;
 
-    // UPDATED: This now generates the correct Shadcn UI date picker with a calendar pop-up.
     case "datepicker":
       return `<FormField
         control={form.control}
@@ -137,9 +136,8 @@ export function generateFormComponent(modelName: string, fields: Field[]): void 
   const modelDirName = capitalize(modelName);
   const outputDir = path.join(getBaseDir(), "src", "pages", modelDirName);
 
-  const mainFormFields = fields.map(generateFormField).join("\n\n                    ");
+  const mainFormFields = fields.map(generateFormField).join("\n\n          ");
 
-  // UPDATED: Added all necessary imports for the date picker component.
   const componentContent = `
 import { useForm } from "react-hook-form";
 import { format } from "date-fns";
