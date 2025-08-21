@@ -2,6 +2,13 @@
 import xlsx from "xlsx";
 import fs from "fs";
 
+// UPDATED: Added validation rules to the Field interface
+export interface ValidationRule {
+  type: 'required' | 'min' | 'max' | 'minLength' | 'maxLength' | 'email' | 'url' | 'regex' | 'custom';
+  value?: number | string | RegExp;
+  message?: string;
+}
+
 // UPDATED: The Field interface now includes the new metadata flags.
 export interface Field {
   fieldName: string;
@@ -25,6 +32,7 @@ export interface Field {
   hidden: boolean;
   isInListing: boolean;
   isRemoveInEditForm: boolean;
+  validationRules : ValidationRule[];
 }
 
 // UPDATED: This function now intelligently removes " Id" from field names ending in "_id".
@@ -55,6 +63,112 @@ function parseOptionsFromComments(comment: string): string[] | undefined {
     options.push(match[1].trim());
   }
   return options.length > 0 ? options : undefined;
+}
+
+// NEW: Function to parse validation rules from the validation_rule column
+function parseValidationRules(validationString: string, fieldName: string): ValidationRule[] {
+  if (!validationString || validationString.trim() === '') return [];
+  
+  const rules: ValidationRule[] = [];
+  const validationStr = validationString.toLowerCase().trim();
+  
+  // Parse different validation patterns
+  const patterns = [
+    // Required validation
+    {
+      regex: /required/i,
+      handler: () => rules.push({ 
+        type: 'required' as const, 
+        message: `${createLabel(fieldName)} is required` 
+      })
+    },
+    // Min/Max length for strings
+    {
+      regex: /min.*?(\d+)/i,
+      handler: (match: RegExpMatchArray) => rules.push({ 
+        type: 'minLength' as const, 
+        value: parseInt(match[1]),
+        message: `${createLabel(fieldName)} must be at least ${match[1]} characters`
+      })
+    },
+    {
+      regex: /max.*?(\d+)/i,
+      handler: (match: RegExpMatchArray) => rules.push({ 
+        type: 'maxLength' as const, 
+        value: parseInt(match[1]),
+        message: `${createLabel(fieldName)} must not exceed ${match[1]} characters`
+      })
+    },
+    // Email validation
+    {
+      regex: /email/i,
+      handler: () => rules.push({ 
+        type: 'email' as const, 
+        message: `Please enter a valid email address`
+      })
+    },
+    // URL validation
+    {
+      regex: /url/i,
+      handler: () => rules.push({ 
+        type: 'url' as const, 
+        message: `Please enter a valid URL`
+      })
+    },
+    // Numeric min/max
+    {
+      regex: /(?:min|minimum).*?(\d+(?:\.\d+)?)/i,
+      handler: (match: RegExpMatchArray) => rules.push({ 
+        type: 'min' as const, 
+        value: parseFloat(match[1]),
+        message: `${createLabel(fieldName)} must be at least ${match[1]}`
+      })
+    },
+    {
+      regex: /(?:max|maximum).*?(\d+(?:\.\d+)?)/i,
+      handler: (match: RegExpMatchArray) => rules.push({ 
+        type: 'max' as const, 
+        value: parseFloat(match[1]),
+        message: `${createLabel(fieldName)} must not exceed ${match[1]}`
+      })
+    },
+    // Custom regex patterns (looking for patterns like "regex:/pattern/")
+    {
+      regex: /regex:\s*\/(.+?)\//i,
+      handler: (match: RegExpMatchArray) => rules.push({ 
+        type: 'regex' as const, 
+        value: new RegExp(match[1]),
+        message: `${createLabel(fieldName)} format is invalid`
+      })
+    }
+  ];
+
+  // Apply all matching patterns
+  patterns.forEach(pattern => {
+    const match = validationStr.match(pattern.regex);
+    if (match) {
+      pattern.handler(match);
+    }
+  });
+
+  // Handle specific validation strings from your Excel
+  if (validationStr.includes('unique')) {
+    rules.push({ 
+      type: 'custom' as const, 
+      value: 'unique',
+      message: `${createLabel(fieldName)} must be unique`
+    });
+  }
+
+  if (validationStr.includes('format')) {
+    rules.push({ 
+      type: 'custom' as const, 
+      value: 'format',
+      message: `${createLabel(fieldName)} format is invalid`
+    });
+  }
+
+  return rules;
 }
 
 export function parseExcel(filePath: string): Record<string, Field[]> {
@@ -131,6 +245,12 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
           default: uiType = "input";
         }
 
+        // NEW: Parse validation rules from the validation_rule column
+        const validationRules = parseValidationRules(
+          String(row.validation_rule || ""), 
+          fieldName
+        );
+
         // UPDATED: Parsing logic for the new metadata columns is added here.
         // It converts a 'Y' from the Excel sheet into a true boolean value.
         return {
@@ -146,6 +266,7 @@ export function parseExcel(filePath: string): Record<string, Field[]> {
           hidden: String(row.hidden || "").trim().toUpperCase() === "Y",
           isInListing: String(row.is_in_listing || "").trim().toUpperCase() === "Y",
           isRemoveInEditForm: String(row.is_remove_in_edit_form || "").trim().toUpperCase() === "Y",
+          validationRules,
         };
       })
       .filter((f): f is Field => f !== null);

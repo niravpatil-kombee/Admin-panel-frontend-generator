@@ -6,6 +6,101 @@ import { Field } from "../excelParser";
 const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+
+// NEW: Function to generate Zod schema from validation rules
+function generateZodValidation(field: Field): string {
+  let zodChain = '';
+  
+  // Start with base type
+  switch (field.zodType) {
+    case 'string':
+      zodChain = 'z.string()';
+      break;
+    case 'number':
+      zodChain = 'z.number()';
+      break;
+    case 'boolean':
+      zodChain = 'z.boolean()';
+      break;
+    case 'date':
+      zodChain = 'z.date()';
+      break;
+    default:
+      zodChain = 'z.any()';
+  }
+
+  // Apply validation rules
+  field.validationRules.forEach(rule => {
+    switch (rule.type) {
+      case 'required':
+        if (field.zodType === 'string') {
+            zodChain += `.min(1, { message: "${rule.message}" })`;
+        }
+        break;
+      // UPDATED: These rules are now inside a check to ensure they only apply to strings and numbers
+      case 'minLength':
+        if (field.zodType === 'string') {
+            zodChain += `.min(${rule.value}, { message: "${rule.message}" })`;
+        }
+        break;
+      case 'maxLength':
+        if (field.zodType === 'string') {
+            zodChain += `.max(${rule.value}, { message: "${rule.message}" })`;
+        }
+        break;
+      case 'min':
+        if (field.zodType === 'number') {
+            zodChain += `.min(${rule.value}, { message: "${rule.message}" })`;
+        }
+        break;
+      case 'max':
+        if (field.zodType === 'number') {
+            zodChain += `.max(${rule.value}, { message: "${rule.message}" })`;
+        }
+        break;
+      case 'email':
+        if (field.zodType === 'string') {
+            zodChain += `.email({ message: "${rule.message}" })`;
+        }
+        break;
+      case 'url':
+        if (field.zodType === 'string') {
+            zodChain += `.url({ message: "${rule.message}" })`;
+        }
+        break;
+    }
+  });
+
+  // Handle required fields that don't have explicit required validation rule
+  if (field.required && !field.validationRules.some(r => r.type === 'required')) {
+    if (field.zodType === 'string') {
+      zodChain += '.min(1, "' + field.label + ' is required")';
+    }
+  }
+
+  // For optional fields, make them optional if not required
+  if (!field.required && !field.validationRules.some(r => r.type === 'required')) {
+    zodChain += '.optional()';
+  }
+
+  return zodChain;
+}
+
+// NEW: Function to generate default values based on field type
+function generateDefaultValue(field: Field): string {
+  if (field.zodType === 'boolean') {
+    return 'false';
+  }
+  if (field.zodType === 'number') {
+    return '0';
+  }
+  if (field.zodType === 'date') {
+    return 'undefined';
+  }
+  return '""';
+}
+
+
 function generateFormField(field: Field): string {
   const commonLabel = `<FormLabel>${field.label}</FormLabel>`;
   let control: string;
@@ -118,9 +213,19 @@ function generateFormField(field: Field): string {
         )}
       />`;
 
-    default:
-      control = `<Input placeholder="${field.placeholder}" {...field} />`;
-  }
+      default:
+        // Apply input type based on validation rules
+        let inputType = 'text';
+        if (field.validationRules.some(r => r.type === 'email')) {
+          inputType = 'email';
+        } else if (field.validationRules.some(r => r.type === 'url')) {
+          inputType = 'url';
+        } else if (field.zodType === 'number') {
+          inputType = 'number';
+        }
+        
+        control = `<Input type="${inputType}" placeholder="${field.placeholder}" {...field} />`;
+    }
 
   return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
     <FormItem>
@@ -136,10 +241,27 @@ export function generateFormComponent(modelName: string, fields: Field[]): void 
   const modelDirName = capitalize(modelName);
   const outputDir = path.join(getBaseDir(), "src", "pages", modelDirName);
 
-  const mainFormFields = fields.map(generateFormField).join("\n\n          ");
+  const mainFormFields = fields
+    .filter(field => !field.isRemoveInEditForm) // Exclude fields marked for removal in edit form
+    .map(generateFormField)
+    .join("\n\n          ");
+
+  // NEW: Generate Zod schema
+  const zodSchema = fields
+    .filter(field => !field.isRemoveInEditForm)
+    .map(field => `  ${field.fieldName}: ${generateZodValidation(field)}`)
+    .join(",\n");
+
+  // NEW: Generate default values
+  const defaultValues = fields
+    .filter(field => !field.isRemoveInEditForm)
+    .map(field => `    ${field.fieldName}: ${generateDefaultValue(field)}`)
+    .join(",\n");
 
   const componentContent = `
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -154,11 +276,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 
-export function ${componentName}() {
-  const form = useForm<any>();
+// Zod validation schema generated from Excel validation rules
+const ${modelName}Schema = z.object({
+${zodSchema}
+});
 
-  function onSubmit(values: any) {
+type ${capitalize(modelName)}FormValues = z.infer<typeof ${modelName}Schema>;
+
+export function ${componentName}() {
+  const form = useForm<${capitalize(modelName)}FormValues>({
+    resolver: zodResolver(${modelName}Schema),
+    defaultValues: {
+${defaultValues}
+    },
+  });
+
+  function onSubmit(values: ${capitalize(modelName)}FormValues) {
     console.log("Form Submitted:", values);
+    // TODO: Implement your form submission logic here
   }
 
   return (
