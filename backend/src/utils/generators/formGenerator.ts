@@ -8,6 +8,7 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // --- All helper functions are correct and unchanged ---
 
+// UPDATED: Zod validation is now smarter about the edit context
 function generateZodValidation(field: Field): string {
   let zodChain = "";
   switch (field.zodType) {
@@ -65,6 +66,13 @@ function generateZodValidation(field: Field): string {
         break;
     }
   });
+
+  // NEW LOGIC: If a field is removed on edit, it MUST be optional in the Zod schema
+  // to allow the "edit" form to validate successfully without submitting the field.
+  if (field.isRemoveInEditForm) {
+    return zodChain + ".optional()";
+  }
+
   if (
     field.required &&
     !field.validationRules.some((r) => r.type === "required")
@@ -143,7 +151,10 @@ function generateFormField(field: Field): string {
       return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel>${field.label}</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />`;
     default:
       let inputType = "text";
-      if (field.validationRules.some((r) => r.type === "email")) {
+      // Ensure password fields are correctly typed
+      if (field.fieldName.toLowerCase().includes("password")) {
+        inputType = "password";
+      } else if (field.validationRules.some((r) => r.type === "email")) {
         inputType = "email";
       } else if (field.validationRules.some((r) => r.type === "url")) {
         inputType = "url";
@@ -155,35 +166,32 @@ function generateFormField(field: Field): string {
   return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (<FormItem>${commonLabel}<FormControl>${control}</FormControl><FormMessage /></FormItem>)} />`;
 }
 
-// MAIN FUNCTION
+// MAIN FUNCTION 
 export function generateFormComponent(
   modelName: string,
   modelConfig: ModelConfig
 ): void {
   const componentName = `${capitalize(modelName)}Form`;
-
   const outputDir = modelConfig.isPopup
     ? path.join(getBaseDir(), "src", "components", "forms")
     : path.join(getBaseDir(), "src", "pages", capitalize(modelName));
 
-  const fieldsForForm = modelConfig.fields.filter(
-    (field) => !field.isRemoveInEditForm
-  );
+  // REMOVED: The pre-filtering logic is now gone.
+  // const fieldsForForm = modelConfig.fields.filter(
+  //   (field) => !field.isRemoveInEditForm
+  // );
 
-  // NEW: Check if any field is a datepicker to determine if date imports are needed
-  const hasDatePicker = fieldsForForm.some(
+  const hasDatePicker = modelConfig.fields.some(
     (field) => field.uiType === "datepicker"
   );
 
-  const zodSchemaFields = fieldsForForm
+  const zodSchemaFields = modelConfig.fields
     .map((field) => `  ${field.fieldName}: ${generateZodValidation(field)}`)
     .join(",\n");
-  const defaultValues = fieldsForForm
+
+  const defaultValues = modelConfig.fields
     .map((field) => `    ${field.fieldName}: ${generateDefaultValue(field)}`)
     .join(",\n");
-  const formFieldsJsx = fieldsForForm
-    .map(generateFormField)
-    .join("\n\n          ");
 
   const componentContent = modelConfig.isPopup
     ? generatePopupFormComponent(
@@ -191,7 +199,7 @@ export function generateFormComponent(
         componentName,
         zodSchemaFields,
         defaultValues,
-        formFieldsJsx,
+        modelConfig.fields, // Pass all fields
         hasDatePicker
       )
     : generateRegularFormComponent(
@@ -199,7 +207,7 @@ export function generateFormComponent(
         componentName,
         zodSchemaFields,
         defaultValues,
-        formFieldsJsx,
+        modelConfig.fields, // Pass all fields
         hasDatePicker
       );
 
@@ -209,7 +217,6 @@ export function generateFormComponent(
 
   const newFilePath = path.join(outputDir, `${componentName}.tsx`);
   fs.writeFileSync(newFilePath, componentContent, "utf8");
-
   console.log(
     `✅ Generated ${
       modelConfig.isPopup ? "Popup Form" : "Page Form"
@@ -217,16 +224,30 @@ export function generateFormComponent(
   );
 }
 
-// UPDATED: Function now accepts a 'hasDatePicker' flag to conditionally render imports
+// UPDATED: Now accepts an array of fields and generates conditional JSX
 function generatePopupFormComponent(
   modelName: string,
   componentName: string,
   zodSchema: string,
   defaultValues: string,
-  mainFormFields: string,
+  fields: Field[],
   hasDatePicker: boolean
 ): string {
   const typeName = `${capitalize(modelName)}FormValues`;
+
+  const mainFormFields = fields
+    .map(field => {
+      const fieldJsx = generateFormField(field);
+      // If the field is marked to be removed in edit forms, wrap it in a conditional render block.
+      // It will only render if `initialData` (and thus an ID) does NOT exist, meaning we are in "create" mode.
+      if (field.isRemoveInEditForm) {
+        return `          {!initialData?.id && (
+            <>${fieldJsx}</>
+          )}`;
+      }
+      return `          ${fieldJsx}`;
+    })
+    .join("\n\n");
 
   const dateImports = hasDatePicker
     ? `
@@ -259,7 +280,8 @@ ${zodSchema}
 type ${capitalize(modelName)}FormValues = z.infer<typeof ${modelName}Schema>;
 
 interface ${componentName}Props {
-  initialData?: Partial<${capitalize(modelName)}FormValues>;
+  // Make initialData's id optional to differentiate create/edit
+  initialData?: Partial<${capitalize(modelName)}FormValues> & { id?: any };
   onSubmit: (values: ${capitalize(modelName)}FormValues) => void;
   onCancel: () => void;
   isLoading?: boolean;
@@ -283,7 +305,7 @@ ${defaultValues},
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          ${mainFormFields}
+${mainFormFields}
         </div>
         <div className="flex justify-end gap-2 pt-4">
           <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
@@ -300,16 +322,30 @@ ${defaultValues},
 `;
 }
 
-// UPDATED: Function now accepts a 'hasDatePicker' flag to conditionally render imports
+// UPDATED: Now accepts an array of fields and generates conditional JSX for regular pages
 function generateRegularFormComponent(
   modelName: string,
   componentName: string,
   zodSchema: string,
   defaultValues: string,
-  mainFormFields: string,
+  fields: Field[],
   hasDatePicker: boolean
 ): string {
   const typeName = `${capitalize(modelName)}FormValues`;
+
+  const mainFormFields = fields
+    .map(field => {
+      const fieldJsx = generateFormField(field);
+      // If the field is marked to be removed in edit forms, wrap it in a conditional render block.
+      // It will only render if the URL does NOT contain an ID, meaning we are in "create" mode.
+      if (field.isRemoveInEditForm) {
+        return `            {!id && (
+              <>${fieldJsx}</>
+            )}`;
+      }
+      return `            ${fieldJsx}`;
+    })
+    .join("\n\n");
 
   const dateImports = hasDatePicker
     ? `
@@ -324,6 +360,7 @@ import { cn } from "@/lib/utils";`
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useParams } from "react-router-dom"; // Import useParams
 ${dateImports}
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -342,10 +379,13 @@ ${zodSchema}
 type ${capitalize(modelName)}FormValues = z.infer<typeof ${modelName}Schema>;
 
 export function ${componentName}() {
+  const { id } = useParams<{ id: string }>(); // Get ID from URL for context
+
   const form = useForm<${capitalize(modelName)}FormValues>({
     resolver: zodResolver(${modelName}Schema),
     defaultValues: {
 ${defaultValues}
+      // TODO: Fetch and populate initialData for edit pages
     },
   });
 
@@ -357,14 +397,14 @@ ${defaultValues}
   return (
     <div className="w-full bg-card border rounded-xl shadow-sm">
       <div className="p-6 md:p-8 border-b">
-        <h1 className="text-2xl font-bold text-foreground">Manage ${capitalize(
+        <h1 className="text-2xl font-bold text-foreground">{id ? 'Edit' : 'Create'} ${capitalize(
           modelName
         )}</h1>
       </div>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 md:p-8 space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-8">
-            ${mainFormFields}
+${mainFormFields}
           </div>
           <div className="flex justify-end pt-4">
             <Button type="submit" size="lg">Save Changes</Button>

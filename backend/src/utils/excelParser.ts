@@ -259,6 +259,9 @@ export function parseExcel(filePath: string): Record<string, ModelConfig> {
         const fieldName = String(row.column).trim();
         const uiComponent = String(row.ui_component || "").toLowerCase();
 
+        // **FIX:** The check for a ui_component is reinstated. If the cell is empty,
+        // the field will be ignored and not included in the form. This correctly
+        // excludes the 'id' field.
         if (!uiComponent) return null;
 
         let zodType: Field["zodType"] = "string";
