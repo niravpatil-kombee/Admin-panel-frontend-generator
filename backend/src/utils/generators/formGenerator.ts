@@ -107,7 +107,7 @@ function generateFormField(field: Field): string {
   let control: string;
   switch (field.uiType) {
     case "textarea":
-      control = `<Textarea placeholder="${field.placeholder}" {...field} />`;
+      control = `<Textarea className="bg-background" placeholder="${field.placeholder}" {...field} />`;
       break;
     case "select":
       const selectOptions = (field.options || ["Default 1", "Default 2"])
@@ -121,8 +121,8 @@ function generateFormField(field: Field): string {
       const valueLogic = field.zodType === 'number'
         ? `String(field.value ?? '')`
         : `field.value`;
-
-      control = `<Select onValueChange={${onChangeLogic}} value={${valueLogic}}><FormControl><SelectTrigger className="w-full"><SelectValue placeholder="${field.placeholder}" /></SelectTrigger></FormControl><SelectContent>${selectOptions}</SelectContent></Select>`;
+      
+      control = `<Select onValueChange={${onChangeLogic}} value={${valueLogic}}><FormControl><SelectTrigger className="w-full bg-background" style={{ height: '2.75rem' }}><SelectValue placeholder="${field.placeholder}" /></SelectTrigger></FormControl><SelectContent>${selectOptions}</SelectContent></Select>`;
       break;
     case "checkbox":
       return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (<FormItem className="flex items-center gap-x-3 space-y-0 pt-8"><FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} /></FormControl><div className="space-y-1 leading-none">${commonLabel}</div></FormItem>)} />`;
@@ -135,8 +135,8 @@ function generateFormField(field: Field): string {
       control = `<RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex items-center space-x-4 pt-2">${radioOptions}</RadioGroup>`;
       break;
     case "file":
-      // ✅ UPDATED: Now uses CloudUpload icon and has improved styling.
       const capFieldName = capitalize(field.fieldName);
+      // ✅ FIX IS HERE: Removed h-10, w-10, and mb-4 from the CloudUpload icon's className.
       return `
 <FormField
   control={form.control}
@@ -147,19 +147,19 @@ function generateFormField(field: Field): string {
       <FormControl>
         <div
           {...getRootPropsFor${capFieldName}()}
-          className={cn("flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-2 cursor-pointer transition", is${capFieldName}DragActive ? "border-primary bg-muted" : "border-muted-foreground/25")}
+          className={cn("bg-background flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-0 cursor-pointer transition", is${capFieldName}DragActive ? "border-primary bg-muted" : "border-muted-foreground/25")}
         >
           <input {...getInputPropsFor${capFieldName}()} />
-          <CloudUpload className="h-10 w-10 text-muted-foreground mb-4" />
+          <CloudUpload className="text-muted-foreground" />
           {${field.fieldName}File ? (
-            <div className="flex flex-col items-center text-center">
+            <div className="flex flex-col items-center text-center mt-4">
               {${field.fieldName}File.type.startsWith("image/") && 
                 <img src={URL.createObjectURL(${field.fieldName}File)} alt="Preview" className="h-20 w-20 rounded-full object-cover mb-2" />
               }
               <p className="text-sm text-foreground">{${field.fieldName}File.name}</p>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Drag & drop a file, or click to select</p>
+            <p className="text-sm text-muted-foreground ">Drag & drop a file, or click to select</p>
           )}
         </div>
       </FormControl>
@@ -168,17 +168,17 @@ function generateFormField(field: Field): string {
   )}
 />`;
     case "color":
-      control = `<Input type="color" {...field} />`;
+      control = `<Input type="color" className="bg-background" style={{ height: '2.75rem' }} {...field} />`;
       break;
     case "datepicker":
-      return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (<FormItem><FormLabel>${field.label}</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full pl-3 text-left font-normal", !field.value && "text-muted-foreground")}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />`;
+      return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (<FormItem><FormLabel>${field.label}</FormLabel><Popover><PopoverTrigger asChild><FormControl><Button variant={"outline"} className={cn("w-full bg-background pl-3 text-left font-normal", !field.value && "text-muted-foreground")} style={{ height: '2.75rem' }}>{field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}<CalendarIcon className="ml-auto h-4 w-4 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus /></PopoverContent></Popover><FormMessage /></FormItem>)} />`;
     default:
       let inputType = "text";
       if (field.fieldName.toLowerCase().includes("password")) inputType = "password";
       else if (field.validationRules.some((r) => r.type === "email")) inputType = "email";
       else if (field.validationRules.some((r) => r.type === "url")) inputType = "url";
       else if (field.zodType === "number") inputType = "number";
-      control = `<Input type="${inputType}" placeholder="${field.placeholder}" {...field} />`;
+      control = `<Input type="${inputType}" className="bg-background" placeholder="${field.placeholder}" style={{ height: '2.75rem' }} {...field} />`;
   }
   return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (<FormItem>${commonLabel}<FormControl>${control}</FormControl><FormMessage /></FormItem>)} />`;
 }
@@ -251,7 +251,6 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
       return `          ${fieldJsx}`;
     }).join("\n\n");
   
-    // ✅ UPDATED: Dynamic lucide-react icon imports
     const lucideIcons = [];
     if (hasFileUpload) lucideIcons.push('CloudUpload');
     if (hasDatePicker) lucideIcons.push('CalendarIcon');
@@ -347,7 +346,6 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
       return `            ${fieldJsx}`;
     }).join("\n\n");
   
-    // ✅ UPDATED: Dynamic lucide-react icon imports
     const lucideIcons = [];
     if (hasFileUpload) lucideIcons.push('CloudUpload');
     if (hasDatePicker) lucideIcons.push('CalendarIcon');
@@ -413,7 +411,7 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
   
     return (
       <div className="w-full bg-card border rounded-xl shadow-sm">
-        <div className="p-6 md:p-8 border-b">
+        <div className="p-6 md-p-8 border-b">
           <h1 className="text-2xl font-bold text-foreground">{id ? 'Edit' : 'Create'} ${capitalize(modelName)}</h1>
         </div>
         <Form {...form}>
