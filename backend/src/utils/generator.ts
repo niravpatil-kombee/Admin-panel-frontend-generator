@@ -53,19 +53,19 @@ router.post("/generate", upload.single("file"), async (req, res) => {
     console.log("Generating layout...");
     generateDashboardLayout();
     generateHeader();
-    generateSidebar(modelNames);
+    generateSidebar(models);
 
     console.log("Generating dashboard page...");
     generateDashboard(modelNames);
 
     console.log("Generating CRUD components...");
     for (const modelName in models) {
-      generateListPage(modelName, models[modelName]);
       generateFormComponent(modelName, models[modelName]);
+      generateListPage(modelName, models[modelName]);
     }
 
     console.log("Generating routes and application root...");
-    generateAppRoutes(modelNames);
+    generateAppRoutes(models);
     generateIndexCss();
     generateMainTsx(); // Generate the main entry point
 

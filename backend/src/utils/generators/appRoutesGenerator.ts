@@ -1,31 +1,55 @@
 // src/utils/generators/appRoutesGenerator.ts
 import fs from "fs";
 import path from "path";
+// UPDATED: Import the ModelConfig interface to understand the data structure
+import { ModelConfig } from "../excelParser";
 
 const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export function generateAppRoutes(modelNames: string[]): void {
+// UPDATED: Function now accepts the entire models object, not just names
+export function generateAppRoutes(models: Record<string, ModelConfig>): void {
   const appPath = path.join(getBaseDir(), "src", "App.tsx");
 
-  const imports = modelNames.map(name => {
-    const capitalizedName = capitalize(name);
-    const formPath = `./pages/${capitalizedName}/${capitalizedName}Form`;
-    const tablePath = `./pages/${capitalizedName}/${capitalizedName}DataTable`;
+  // NOW SMART: Generate imports conditionally
+  const imports = Object.entries(models).map(([modelName, config]) => {
+    const capitalizedName = capitalize(modelName);
+    
+    // Every model gets a DataTable import
+    const tableImport = `import { ${capitalizedName}DataTable } from './pages/${capitalizedName}/${capitalizedName}DataTable';`;
 
-    return `import { ${capitalizedName}Form } from '${formPath}';
-import { ${capitalizedName}DataTable } from '${tablePath}';`;
+    // ONLY regular (non-popup) models get a Form import for routing
+    if (!config.isPopup) {
+      const formImport = `import { ${capitalizedName}Form } from './pages/${capitalizedName}/${capitalizedName}Form';`;
+      return `${tableImport}\n${formImport}`;
+    }
+    
+    return tableImport;
   }).join("\n");
 
-  const routeTags = modelNames.map(name => {
-    const lower = name.toLowerCase();
+  // NOW SMART: Generate routes conditionally
+  const routeTags = Object.entries(models).map(([modelName, config]) => {
+    const capitalizedName = capitalize(modelName);
+    const lower = modelName.toLowerCase();
     const plural = `${lower}s`;
+
+    // The listing page route is always generated for every model
+    const listingRoute = `<Route path="/${plural}" element={<${capitalizedName}DataTable />} />`;
+
+    // ONLY regular (non-popup) models get create/edit routes
+    if (!config.isPopup) {
+      return `
+        {/* Routes for ${capitalizedName} (Full Page CRUD) */}
+        ${listingRoute}
+        <Route path="/${lower}/create" element={<${capitalizedName}Form />} />
+        <Route path="/${lower}/edit/:id" element={<${capitalizedName}Form />} />
+      `;
+    }
+
+    // Popup models only need the listing route
     return `
-        {/* Routes for ${capitalize(name)} */}
-        <Route path="/${plural}" element={<${capitalize(name)}DataTable />} /> 
-        <Route path="/${lower}/create" element={<${capitalize(name)}Form />} />
-        <Route path="/${lower}/edit/:id" element={<${capitalize(name)}Form />} />
-        <Route path="/${lower}/view/:id" element={<${capitalize(name)}Form />} />
+        {/* Routes for ${capitalizedName} (Popup CRUD) */}
+        ${listingRoute}
     `;
   }).join("\n");
 
@@ -40,13 +64,8 @@ ${imports}
 function App() {
   return (
     <Routes>
-
-     {/* Auth routes are rendered outside the main dashboard layout */}
       <Route path="/login" element={<LoginPage />} />
-
-       {/* Main application routes are protected by the DashboardLayout */}
       <Route path="/" element={<DashboardLayout />}>
-        {/* UPDATED: Set Dashboard as the index route */}
         <Route index element={<Dashboard />} />
         ${routeTags}
       </Route>
@@ -57,5 +76,5 @@ function App() {
 export default App;
 `;
   fs.writeFileSync(appPath, content, "utf8");
-  console.log("✅ Updated App.tsx to use the new Dashboard component.");
+  console.log("✅ Updated App.tsx with smart routing for popup and page-based models.");
 }
