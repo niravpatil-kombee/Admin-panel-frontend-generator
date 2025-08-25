@@ -2,3 +2,5 @@ node_modules
 excel-sample
 generated-backend
 uploads
+.env
+

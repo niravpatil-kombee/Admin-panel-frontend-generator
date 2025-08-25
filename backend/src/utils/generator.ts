@@ -18,6 +18,8 @@ import { generateListPage } from "./generators/listPageGenerator";
 import { generateDashboard } from "./generators/dashboardGenerator";
 import { generateIndexCss } from "./generators/indexCssGenerator";
 import { generateLogin } from "./generators/loginGenerator";
+
+
 // UPDATED: Import new theme and main.tsx generators
 import {
   generateThemeProvider,
@@ -34,6 +36,7 @@ router.post("/generate", upload.single("file"), async (req, res) => {
 
     console.log("\n🚀 Admin Panel Generation Process Started 🚀");
     setupFrontendProject();
+
 
     const models = parseExcel(req.file.path);
     const modelNames = Object.keys(models);
