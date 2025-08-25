@@ -18,7 +18,8 @@ import { generateListPage } from "./generators/listPageGenerator";
 import { generateDashboard } from "./generators/dashboardGenerator";
 import { generateIndexCss } from "./generators/indexCssGenerator";
 import { generateLogin } from "./generators/loginGenerator";
-
+import { generateApiService } from "./generators/apiServiceGenerator";
+import { generateApiSetup } from "./generators/apiSetupGenerator";
 
 // UPDATED: Import new theme and main.tsx generators
 import {
@@ -37,6 +38,9 @@ router.post("/generate", upload.single("file"), async (req, res) => {
     console.log("\n🚀 Admin Panel Generation Process Started 🚀");
     setupFrontendProject();
 
+    console.log("Generating Axios API setup...");
+    generateApiSetup();
+    generateApiService();
 
     const models = parseExcel(req.file.path);
     const modelNames = Object.keys(models);

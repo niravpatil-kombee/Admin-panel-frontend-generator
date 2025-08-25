@@ -274,38 +274,51 @@ function generateFormField(field: Field): string {
   )} />`;
 }
 
+// --- UPDATED FUNCTION ---
 function generateOnSubmitFunction(modelName: string, fileFields: Field[], isPopup: boolean): string {
-    const typeName = `${capitalize(modelName)}FormValues`;
-    if (fileFields.length === 0) {
-      const body = isPopup 
-        ? `    onSubmit(values);`
-        : `    console.log("Form Submitted:", values);\n    // TODO: Implement submission logic`;
-      return `  function ${isPopup ? 'handleFormSubmit' : 'onSubmit'}(values: ${typeName}) {\n${body}\n  }`;
-    }
+  const typeName = `${capitalize(modelName)}FormValues`;
   
-    const formDataLogic = fileFields.map(field => `
-      if (${field.fieldName}File) {
-        formData.append("${field.fieldName}", ${field.fieldName}File);
-      } else if (values.${field.fieldName}) {
-        formData.append("${field.fieldName}", values.${field.fieldName});
-      }`).join('');
-  
+  // Logic for forms WITHOUT file uploads (e.g., Role, Brand)
+  if (fileFields.length === 0) {
     const body = isPopup 
-      ? `    onSubmit(formData);`
-      : `    console.log("FormData ready:", formData);\n    // TODO: Implement submission logic`;
-  
-    return `  function ${isPopup ? 'handleFormSubmit' : 'onSubmit'}(values: ${typeName}) {
-      const formData = new FormData();
-      for (const key in values) {
-        const value = values[key as keyof typeof values];
-        if (${fileFields.map(f => `key === '${f.fieldName}'`).join(' || ')}) continue;
-        if (value instanceof Date) formData.append(key, value.toISOString());
-        else if (value !== null && value !== undefined) formData.append(key, String(value));
-      }
-      ${formDataLogic}
-      ${body}
-    }`;
+      ? `    onSubmit(values);`
+      : `    console.log("Form Submitted (JSON):", values);\n    // TODO: Implement your submission logic here.`;
+    return `  function ${isPopup ? 'handleFormSubmit' : 'onSubmit'}(values: ${typeName}) {\n${body}\n  }`;
   }
+
+  // Logic for forms WITH file uploads (e.g., User)
+  const formDataLogic = fileFields.map(field => `
+    if (${field.fieldName}File) {
+      formData.append("${field.fieldName}", ${field.fieldName}File);
+    } else if (values.${field.fieldName}) {
+      formData.append("${field.fieldName}", values.${field.fieldName});
+    }`).join('');
+
+  // --- THIS IS THE FIX ---
+  // Update the 'body' for non-popup forms to provide a clear log.
+  const body = isPopup 
+    ? `    onSubmit(formData);`
+    : `    console.log("Form Submitted (FormData):");
+  for (const [key, value] of formData.entries()) {
+    console.log(key, value);
+  }
+  // TODO: Implement your FormData submission logic here (e.g., apiService.post('/users', formData)).`;
+
+  return `  function ${isPopup ? 'handleFormSubmit' : 'onSubmit'}(values: ${typeName}) {
+    const formData = new FormData();
+    for (const key in values) {
+      const value = values[key as keyof typeof values];
+      if (${fileFields.map(f => `key === '${f.fieldName}'`).join(' || ')}) continue;
+      if (value instanceof Date) {
+        formData.append(key, value.toISOString());
+      } else if (value !== null && value !== undefined) {
+        formData.append(key, String(value));
+      }
+    }
+    ${formDataLogic}
+    ${body}
+  }`;
+}
 
 // --- MAIN GENERATOR FUNCTION ---
 
