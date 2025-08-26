@@ -18,8 +18,10 @@ import { generateListPage } from "./generators/listPageGenerator";
 import { generateDashboard } from "./generators/dashboardGenerator";
 import { generateIndexCss } from "./generators/indexCssGenerator";
 import { generateLogin } from "./generators/loginGenerator";
-import { generateApiService } from "./generators/apiServiceGenerator";
-import { generateApiSetup } from "./generators/apiSetupGenerator";
+import { generateReduxThunks } from "./generators/reduxThunkGenerator"; 
+import { generateApiSetup } from "./generators/reduxSetupGenerator";
+import { generateI18n } from "./generators/i18Generator";
+import { generateLanguageSwitcher } from "./generators/languageSwitcherGenerator";
 
 // UPDATED: Import new theme and main.tsx generators
 import {
@@ -40,7 +42,7 @@ router.post("/generate", upload.single("file"), async (req, res) => {
 
     console.log("Generating Axios API setup...");
     generateApiSetup();
-    generateApiService();
+    generateReduxThunks();
 
     const models = parseExcel(req.file.path);
     const modelNames = Object.keys(models);
@@ -53,6 +55,10 @@ router.post("/generate", upload.single("file"), async (req, res) => {
     generateThemeProvider();
     generateThemeToggle();
 
+
+    console.log("Generating i18n setup...");
+    generateI18n(modelNames); 
+    generateLanguageSwitcher()
 
     console.log("Generating Login pages...");
     generateLogin();

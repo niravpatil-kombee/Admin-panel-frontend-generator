@@ -30,15 +30,15 @@ export function setupFrontendProject(): void {
   // Step 2: Install general dependencies
   console.log("📦 Installing app dependencies...");
   execSync(
-    `npm install axios react-router-dom lucide-react class-variance-authority tailwind-variants react-hook-form zod @hookform/resolvers clsx tailwind-merge @tanstack/react-table date-fns react-dropzone`,
+    `npm install axios react-router-dom lucide-react class-variance-authority tailwind-variants react-hook-form zod @hookform/resolvers clsx tailwind-merge @tanstack/react-table date-fns react-dropzone @reduxjs/toolkit react-redux react-i18next i18next-browser-languagedetector`,
     frontendExecOptions
   );
 
   // Remove the app.css default config
   const appCssPath = path.join(baseDir, "src", "App.css");
   if (fs.existsSync(appCssPath)) {
-      fs.writeFileSync(appCssPath, ""); // Make the file empty
-      console.log("🧹 Cleaned up default App.css styles.");
+    fs.writeFileSync(appCssPath, ""); // Make the file empty
+    console.log("🧹 Cleaned up default App.css styles.");
   }
 
   // Step 3: Install TailwindCSS v3 (Shadcn compatible)

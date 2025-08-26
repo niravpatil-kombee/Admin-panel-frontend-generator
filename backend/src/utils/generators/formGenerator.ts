@@ -1,4 +1,3 @@
-// src/utils/generators/formGenerator.ts
 import fs from "fs";
 import path from "path";
 import { Field, ModelConfig } from "../excelParser";
@@ -215,7 +214,7 @@ function generateFormField(field: Field): string {
               <p className="text-sm text-foreground">{${field.fieldName}File.name}</p>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground ">Drag & drop a file, or click to select</p>
+            <p className="text-sm text-muted-foreground ">{t('common.dragAndDrop')}</p>
           )}
         </div>
       </FormControl>
@@ -239,7 +238,7 @@ function generateFormField(field: Field): string {
                   "w-full bg-background pl-3 text-left font-normal",
                   !field.value && "text-muted-foreground"
                 )} style={{ height: '2.75rem' }}>
-                  {field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}
+                  {field.value ? (format(field.value, "PPP")) : (<span>{t('common.pickADate')}</span>)}
                   <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                 </Button>
               </FormControl>
@@ -368,6 +367,7 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
       `import { useForm } from "react-hook-form";`,
       `import { zodResolver } from "@hookform/resolvers/zod";`,
       `import * as z from "zod";`,
+      `import { useTranslation } from "react-i18next";`,
       (hasFileUpload || hasPassword) && `import { useState } from "react";`,
       hasFileUpload && `import { useDropzone } from "react-dropzone";`,
       hasDatePicker && `import { format } from "date-fns";`,
@@ -416,6 +416,7 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
   }
   
   export function ${componentName}({ initialData, onSubmit, onCancel, isLoading = false }: ${componentName}Props) {
+    const { t } = useTranslation();
   ${stateHooks}
   ${passwordStateHook}
     const form = useForm<${typeName}>({
@@ -436,8 +437,8 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
   ${mainFormFields}
           </div>
           <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>Cancel</Button>
-            <Button type="submit" disabled={isLoading}>{isLoading ? "Saving..." : "Save"}</Button>
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>{t('common.cancel')}</Button>
+            <Button type="submit" disabled={isLoading}>{isLoading ? t('common.saving') : t('common.save')}</Button>
           </div>
         </form>
       </Form>
@@ -447,6 +448,7 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
   
   function generateRegularFormComponent(modelName: string, componentName: string, zodSchema: string, defaultValues: string, fields: Field[], hasDatePicker: boolean, hasFileUpload: boolean, hasPassword: boolean): string {
     const typeName = `${capitalize(modelName)}FormValues`;
+    const singleModel = modelName.toLowerCase();
     const fileFields = fields.filter(f => f.uiType === 'file');
   
     const mainFormFields = fields.map(field => {
@@ -470,6 +472,7 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
       `import { zodResolver } from "@hookform/resolvers/zod";`,
       `import * as z from "zod";`,
       `import { useParams } from "react-router-dom";`,
+      `import { useTranslation } from "react-i18next";`,
       (hasFileUpload || hasPassword) && `import { useState } from "react";`,
       hasFileUpload && `import { useDropzone } from "react-dropzone";`,
       hasDatePicker && `import { format } from "date-fns";`,
@@ -512,6 +515,7 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
   
   export function ${componentName}() {
     const { id } = useParams<{ id: string }>();
+    const { t } = useTranslation();
   ${stateHooks}
   ${passwordStateHook}
   
@@ -529,7 +533,9 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
     return (
       <div className="w-full bg-card border rounded-xl shadow-sm">
         <div className="p-6 md-p-8 border-b">
-          <h1 className="text-2xl font-bold text-foreground">{id ? 'Edit' : 'Create'} ${capitalize(modelName)}</h1>
+          <h1 className="text-2xl font-bold text-foreground">
+            {id ? t('form.editTitle', { model: t('models.${singleModel}') }) : t('form.createTitle', { model: t('models.${singleModel}') })}
+          </h1>
         </div>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 md:p-8 space-y-8">
@@ -537,7 +543,7 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
   ${mainFormFields}
             </div>
             <div className="flex justify-end pt-4">
-              <Button type="submit" size="lg">Save Changes</Button>
+              <Button type="submit" size="lg">{t('common.save')}</Button>
             </div>
           </form>
         </Form>

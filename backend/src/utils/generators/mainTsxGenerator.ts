@@ -15,16 +15,22 @@ import { BrowserRouter } from "react-router-dom";
 import App from './App.tsx'
 import './index.css'
 import { ThemeProvider } from "@/components/theme-provider"
+import './i18n';
+
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
-        <App />
-      </ThemeProvider>
-    </BrowserRouter>
-  </React.StrictMode>,
-)
+    <React.Suspense fallback="Loading...">
+    
+        <BrowserRouter>
+          <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+            <App />
+          </ThemeProvider>
+        </BrowserRouter>
+     
+    </React.Suspense>
+  </React.StrictMode>
+);
 `;
     fs.writeFileSync(mainTsxPath, content, "utf8");
     console.log("✅ Generated main.tsx with ThemeProvider.");

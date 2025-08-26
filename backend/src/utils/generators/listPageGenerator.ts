@@ -1,4 +1,3 @@
-// src/utils/generators/listPageGenerator.ts
 import fs from "fs";
 import path from "path";
 import { Field, ModelConfig } from "../excelParser";
@@ -67,6 +66,7 @@ export function generateListPage(
   const componentContent = `
 import * as React from "react"
 import { Link, useSearchParams } from "react-router-dom"
+import { useTranslation } from "react-i18next";
 import { flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table"
 import { ArrowUpDown, Plus, Eye, Pencil, Trash2, Upload, Download } from "lucide-react"
 import { Input } from "@/components/ui/input"
@@ -82,6 +82,7 @@ ${modelTypeDefinition}
 ${mockData}
 
 export function ${componentName}() {
+  const { t } = useTranslation();
   const [data, setData] = React.useState<${modelTypeName}[]>(mockData);
   const [sorting, setSorting] = React.useState<any[]>([]);
   const [columnFilters, setColumnFilters] = React.useState<any[]>([]);
@@ -140,16 +141,16 @@ export function ${componentName}() {
     }`
       )
       .join(",\n    ")},
-    { id: "actions", header: () => <div className="text-right">Actions</div>, cell: ({ row }) => (<div className="flex items-center justify-end gap-1">
-      <Button variant="ghost" size="icon" title="View" onClick={() => setViewingRow(row.original)}><Eye className="h-4 w-4" /></Button>
+    { id: "actions", header: () => <div className="text-right">{t('common.actions')}</div>, cell: ({ row }) => (<div className="flex items-center justify-end gap-1">
+      <Button variant="ghost" size="icon" title={t('common.view')} onClick={() => setViewingRow(row.original)}><Eye className="h-4 w-4" /></Button>
       ${
         isPopup
-          ? `<Button variant="ghost" size="icon" title="Edit" onClick={() => handleEdit(row.original)}><Pencil className="h-4 w-4" /></Button>`
-          : `<Button asChild variant="ghost" size="icon" title="Edit"><Link to={\`/${singleModel}/edit/\${row.original.id}\`}><Pencil className="h-4 w-4" /></Link></Button>`
+          ? `<Button variant="ghost" size="icon" title={t('common.edit')} onClick={() => handleEdit(row.original)}><Pencil className="h-4 w-4" /></Button>`
+          : `<Button asChild variant="ghost" size="icon" title={t('common.edit')}><Link to={\`/${singleModel}/edit/\${row.original.id}\`}><Pencil className="h-4 w-4" /></Link></Button>`
       }
-      <Button variant="ghost" size="icon" title="Delete" className="text-red-600" onClick={() => handleDeleteRow(row.original.id)}><Trash2 className="h-4 w-4" /></Button>
+      <Button variant="ghost" size="icon" title={t('common.delete')} className="text-red-600" onClick={() => handleDeleteRow(row.original.id)}><Trash2 className="h-4 w-4" /></Button>
     </div>) },
-  ], []);
+  ], [t]);
 
   const table = useReactTable({ data, columns, onSortingChange: setSorting, onColumnFiltersChange: setColumnFilters, onRowSelectionChange: setRowSelection, getCoreRowModel: getCoreRowModel(), getPaginationRowModel: getPaginationRowModel(), getSortedRowModel: getSortedRowModel(), getFilteredRowModel: getFilteredRowModel(), state: { sorting, columnFilters, rowSelection } });
 
@@ -157,37 +158,37 @@ export function ${componentName}() {
     <>
       <div className="w-full rounded-xl border bg-card shadow-sm p-4 md:p-6">
         <div className="flex items-center justify-between gap-4 py-4">
-          <h1 className="text-2xl font-bold">Manage ${modelTypeName}s</h1>
+          <h1 className="text-2xl font-bold">{t('table.manageTitle', { model: t('models.${singleModel}_plural') })}</h1>
           <div className="flex items-center gap-2">
-            {table.getFilteredSelectedRowModel().rows.length > 0 && (<Button variant="destructive" size="sm" onClick={handleDeleteSelected}>Delete ({table.getFilteredSelectedRowModel().rows.length})</Button>)}
+            {table.getFilteredSelectedRowModel().rows.length > 0 && (<Button variant="destructive" size="sm" onClick={handleDeleteSelected}>{t('table.deleteSelected', { count: table.getFilteredSelectedRowModel().rows.length })}</Button>)}
             <Button variant="outline" size="sm" onClick={() => alert('Import functionality to be implemented.')}>
-              <Upload className="h-4 w-4 mr-2" /> Import
+              <Upload className="h-4 w-4 mr-2" /> {t('common.import')}
             </Button>
             <Button variant="outline" size="sm" onClick={() => alert('Export functionality to be implemented.')}>
-              <Download className="h-4 w-4 mr-2" /> Export
+              <Download className="h-4 w-4 mr-2" /> {t('common.export')}
             </Button>
             ${
               isPopup
-                ? `<Button size="sm" onClick={handleCreate}><Plus className="h-4 w-4 mr-2" /> New ${modelTypeName}</Button>`
-                : `<Button asChild size="sm"><Link to="/${singleModel}/create"><Plus className="h-4 w-4 mr-2" /> New ${modelTypeName}</Link></Button>`
+                ? `<Button size="sm" onClick={handleCreate}><Plus className="h-4 w-4 mr-2" /> {t('common.new')} {t('models.${singleModel}')}</Button>`
+                : `<Button asChild size="sm"><Link to="/${singleModel}/create"><Plus className="h-4 w-4 mr-2" /> {t('common.new')} {t('models.${singleModel}')}</Link></Button>`
             }
           </div>
         </div>
         <div className="rounded-md border">
           <Table>
             <TableHeader>{table.getHeaderGroups().map(hg => (<TableRow key={hg.id}>{hg.headers.map(h => (<TableHead key={h.id}>{flexRender(h.column.columnDef.header, h.getContext())}</TableHead>))}</TableRow>))}</TableHeader>
-            <TableBody>{table.getRowModel().rows.length ? table.getRowModel().rows.map(row => (<TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>{row.getVisibleCells().map(cell => (<TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>))}</TableRow>)) : (<TableRow><TableCell colSpan={columns.length} className="h-24 text-center">No results.</TableCell></TableRow>)}</TableBody>
+            <TableBody>{table.getRowModel().rows.length ? table.getRowModel().rows.map(row => (<TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>{row.getVisibleCells().map(cell => (<TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>))}</TableRow>)) : (<TableRow><TableCell colSpan={columns.length} className="h-24 text-center">{t('common.noResults')}</TableCell></TableRow>)}</TableBody>
           </Table>
         </div>
         <div className="flex items-center justify-between space-x-4 py-4">
-          <div className="text-sm text-muted-foreground">{table.getFilteredSelectedRowModel().rows.length} of {table.getFilteredRowModel().rows.length} selected.</div>
-          <div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>Previous</Button><Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>Next</Button></div>
+          <div className="text-sm text-muted-foreground">{t('common.selected', { count: table.getFilteredSelectedRowModel().rows.length, total: table.getFilteredRowModel().rows.length })}</div>
+          <div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>{t('common.previous')}</Button><Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>{t('common.next')}</Button></div>
         </div>
       </div>
       
       <Dialog open={!!viewingRow} onOpenChange={isOpen => !isOpen && setViewingRow(null)}>
         <DialogContent className="sm:max-w-md p-0">
-          <DialogHeader className="p-6 pb-4"><DialogTitle>${modelTypeName} Details</DialogTitle></DialogHeader>
+          <DialogHeader className="p-6 pb-4"><DialogTitle>{t('form.viewTitle', { model: t('models.${singleModel}') })}</DialogTitle></DialogHeader>
           <div className="border-y"><div className="grid auto-rows-min gap-y-4 p-6">
             ${fieldsForDialog
               .map(
@@ -200,12 +201,12 @@ export function ${componentName}() {
               )
               .join("")}
           </div></div>
-          <DialogFooter className="sm:justify-end gap-2 p-6 pt-4"><Button variant="outline" onClick={() => setViewingRow(null)}>Cancel</Button><Button asChild><Link to={\`/${singleModel}/edit/\${viewingRow?.id}\`}><Pencil className="mr-2 h-4 w-4" /> Edit</Link></Button></DialogFooter>
+          <DialogFooter className="sm:justify-end gap-2 p-6 pt-4"><Button variant="outline" onClick={() => setViewingRow(null)}>{t('common.cancel')}</Button><Button asChild><Link to={\`/${singleModel}/edit/\${viewingRow?.id}\`}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</Link></Button></DialogFooter>
         </DialogContent>
       </Dialog>
       
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setItemToDelete(null)}>Cancel</AlertDialogCancel><AlertDialogAction onClick={confirmDelete}>Continue</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('common.areYouSure')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSureDescription')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setItemToDelete(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={confirmDelete}>{t('common.continue')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
 
       ${
@@ -215,7 +216,7 @@ export function ${componentName}() {
         {/* --- UPDATED: Drawer width increased from 500px to 720px --- */}
         <DrawerContent className="w-[720px] max-w-full h-full">
           <DrawerHeader>
-            <DrawerTitle>{editingRow ? 'Edit' : 'Create'} ${modelTypeName}</DrawerTitle>
+            <DrawerTitle>{editingRow ? t('form.editTitle', { model: t('models.${singleModel}') }) : t('form.createTitle', { model: t('models.${singleModel}') })}</DrawerTitle>
           </DrawerHeader>
           <div className="p-6 overflow-y-auto">
             <${formComponentName}
