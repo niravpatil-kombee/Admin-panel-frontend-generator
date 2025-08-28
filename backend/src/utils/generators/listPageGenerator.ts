@@ -214,7 +214,7 @@ export function ${componentName}() {
           ? `
       <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen} direction="right">
         {/* --- UPDATED: Drawer width increased from 500px to 720px --- */}
-        <DrawerContent className="w-[720px] max-w-full h-full">
+        <DrawerContent className="w-[500px] ml-auto h-full">
           <DrawerHeader>
             <DrawerTitle>{editingRow ? t('form.editTitle', { model: t('models.${singleModel}') }) : t('form.createTitle', { model: t('models.${singleModel}') })}</DrawerTitle>
           </DrawerHeader>
