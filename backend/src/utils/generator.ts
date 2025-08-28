@@ -18,6 +18,9 @@ import { generateListPage } from "./generators/listPageGenerator";
 import { generateDashboard } from "./generators/dashboardGenerator";
 import { generateIndexCss } from "./generators/indexCssGenerator";
 import { generateLogin } from "./generators/loginGenerator";
+import { generateApiService } from "./generators/apiServiceGenerator";
+import { generateApiSetup } from "./generators/apiSetupGenerator";
+
 // UPDATED: Import new theme and main.tsx generators
 import {
   generateThemeProvider,
@@ -34,6 +37,10 @@ router.post("/generate", upload.single("file"), async (req, res) => {
 
     console.log("\n🚀 Admin Panel Generation Process Started 🚀");
     setupFrontendProject();
+
+    console.log("Generating Axios API setup...");
+    generateApiSetup();
+    generateApiService();
 
     const models = parseExcel(req.file.path);
     const modelNames = Object.keys(models);
@@ -53,19 +60,19 @@ router.post("/generate", upload.single("file"), async (req, res) => {
     console.log("Generating layout...");
     generateDashboardLayout();
     generateHeader();
-    generateSidebar(modelNames);
+    generateSidebar(models);
 
     console.log("Generating dashboard page...");
     generateDashboard(modelNames);
 
     console.log("Generating CRUD components...");
     for (const modelName in models) {
-      generateListPage(modelName, models[modelName]);
       generateFormComponent(modelName, models[modelName]);
+      generateListPage(modelName, models[modelName]);
     }
 
     console.log("Generating routes and application root...");
-    generateAppRoutes(modelNames);
+    generateAppRoutes(models);
     generateIndexCss();
     generateMainTsx(); // Generate the main entry point
 

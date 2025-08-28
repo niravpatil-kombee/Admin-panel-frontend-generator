@@ -1,30 +1,44 @@
 // src/utils/generators/sidebarGenerator.ts
 import fs from "fs";
 import path from "path";
+// UPDATED: Import the ModelConfig to understand the full model structure
+import { ModelConfig } from "../excelParser";
 
 const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export function generateSidebar(modelNames: string[]): void {
+// UPDATED: The function now accepts the entire 'models' object, not just an array of names
+export function generateSidebar(models: Record<string, ModelConfig>): void {
   const dir = path.join(getBaseDir(), "src", "components", "layout");
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
+  // UPDATED: The logic to build navItems is now aware of the 'isPopup' flag
   const navItems = [
     { label: "Dashboard", href: "/", icon: "Home" },
-    ...modelNames.map(name => ({
-      label: capitalize(name),
-      icon: "Users",
-      children: [
-        {
-          label: `All ${capitalize(name)}`,
-          href: `/${name.toLowerCase()}s`,
-        },
-        {
-          label: `Create ${capitalize(name)}`,
-          href: `/${name.toLowerCase()}/create`,
+    ...Object.entries(models).map(([name, config]) => {
+        const lower = name.toLowerCase();
+        
+        // If it's a popup, the "Create" link goes to the list page with a special parameter.
+        // Otherwise, it goes to the dedicated create page.
+        const createHref = config.isPopup 
+            ? `/${lower}s?action=create` 
+            : `/${lower}/create`;
+            
+        return {
+            label: capitalize(name),
+            icon: "Users",
+            children: [
+                {
+                label: `All ${capitalize(name)}`,
+                href: `/${name.toLowerCase()}s`,
+                },
+                {
+                label: `Create ${capitalize(name)}`,
+                href: createHref,
+                }
+            ]
         }
-      ]
-    }))
+    })
   ];
 
   const content = `
@@ -38,8 +52,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 const iconMap: { [key: string]: React.ElementType } = { Home, Users, Settings };
 const navItems = ${JSON.stringify(navItems, null, 2)};
 
+// UPDATED: The active link check now ignores URL parameters like '?action=create'
 const isLinkActive = (item: any, pathname: string): boolean => {
-  if (item.href === pathname) return true;
+  if (item.href && item.href.split('?')[0] === pathname) return true;
   return item.children?.some((child: any) => isLinkActive(child, pathname)) ?? false;
 };
 
@@ -82,7 +97,8 @@ const NavMenu: React.FC<{ items: any[]; pathname: string; isOpen: boolean }> = (
                   to={child.href}
                   className={cn(
                     "flex items-center gap-3 p-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-gray-800",
-                    pathname === child.href ? "text-white font-semibold" : ""
+                    // Also updated this check to ignore URL parameters
+                    pathname === child.href.split('?')[0] ? "text-white font-semibold" : ""
                   )}
                 >
                   <Circle className="h-2 w-2 fill-current" />
@@ -157,5 +173,5 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }: SidebarProps) {
 }
 `;
   fs.writeFileSync(path.join(dir, "Sidebar.tsx"), content, "utf8");
-  console.log("✅ Generated responsive Sidebar component with dark theme.");
+  console.log("✅ Generated responsive Sidebar component with smart links.");
 }

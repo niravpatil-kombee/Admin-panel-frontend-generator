@@ -1,31 +1,151 @@
 // src/utils/generators/formGenerator.ts
 import fs from "fs";
 import path from "path";
-import { Field } from "../excelParser";
+import { Field, ModelConfig } from "../excelParser";
 
 const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+// --- HELPER FUNCTIONS ---
+
+function generateZodValidation(field: Field): string {
+  let zodChain = "";
+  
+  // Check if this is an ID field and override the zodType to string
+  const isIdField = field.fieldName.toLowerCase().includes('id') || field.fieldName.toLowerCase().endsWith('_id');
+  
+  if (isIdField && field.zodType === "number") {
+    zodChain = "z.string()";
+  } else {
+    switch (field.zodType) {
+      case "string":
+        zodChain = "z.string()";
+        break;
+      case "number":
+        zodChain = "z.number()";
+        break;
+      case "boolean":
+        zodChain = "z.boolean()";
+        break;
+      case "date":
+        zodChain = "z.date()";
+        break;
+      default: // Catches 'any' for file uploads
+        zodChain = "z.any()";
+    }
+  }
+
+  field.validationRules.forEach((rule) => {
+    switch (rule.type) {
+      case "required":
+        if (field.zodType === "string" || isIdField) {
+          zodChain += `.min(1, { message: "${rule.message}" })`;
+        }
+        if (field.zodType === "any") {
+          zodChain += `.refine(file => file, { message: "${rule.message}" })`;
+        }
+        break;
+      case "minLength":
+        if (field.zodType === "string" || isIdField) {
+          zodChain += `.min(${rule.value}, { message: "${rule.message}" })`;
+        }
+        break;
+      case "maxLength":
+        if (field.zodType === "string" || isIdField) {
+          zodChain += `.max(${rule.value}, { message: "${rule.message}" })`;
+        }
+        break;
+      case "min":
+        if (field.zodType === "number" && !isIdField) {
+          zodChain += `.min(${rule.value}, { message: "${rule.message}" })`;
+        }
+        break;
+      case "max":
+        if (field.zodType === "number" && !isIdField) {
+          zodChain += `.max(${rule.value}, { message: "${rule.message}" })`;
+        }
+        break;
+      case "email":
+        if (field.zodType === "string") {
+          zodChain += `.email({ message: "${rule.message}" })`;
+        }
+        break;
+      case "url":
+        if (field.zodType === "string") {
+          zodChain += `.url({ message: "${rule.message}" })`;
+        }
+        break;
+    }
+  });
+
+  if (field.isRemoveInEditForm) {
+    return zodChain + ".optional()";
+  }
+
+  if (
+    field.required &&
+    !field.validationRules.some((r) => r.type === "required")
+  ) {
+    if (field.zodType === "string" || isIdField) {
+      zodChain += `.min(1, "${field.label} is required")`;
+    }
+    if (field.zodType === "any") {
+      zodChain += `.refine(file => file, { message: "${field.label} is required." })`;
+    }
+  }
+  if (
+    !field.required &&
+    !field.validationRules.some((r) => r.type === "required")
+  ) {
+    zodChain += ".optional().nullable()";
+  }
+  return zodChain;
+}
+
+function generateDefaultValue(field: Field): string {
+  const isIdField = field.fieldName.toLowerCase().includes('id') || field.fieldName.toLowerCase().endsWith('_id');
+  
+  if (field.zodType === "boolean") return "false";
+  if (field.zodType === "number" && !isIdField) return "0";
+  if (field.zodType === "date") return "undefined";
+  if (field.zodType === "any") return "null";
+  // For ID fields, return empty string instead of 0
+  if (isIdField) return '""';
+  return '""';
+}
+
 function generateFormField(field: Field): string {
   const commonLabel = `<FormLabel>${field.label}</FormLabel>`;
+  const isIdField = field.fieldName.toLowerCase().includes('id') || field.fieldName.toLowerCase().endsWith('_id');
   let control: string;
 
   switch (field.uiType) {
     case "textarea":
-      control = `<Textarea placeholder="${field.placeholder}" {...field} />`;
+      control = `<Textarea className="bg-background" placeholder="${field.placeholder}" {...field} />`;
       break;
 
     case "select":
-      const selectOptions = (field.options || ["Default Option 1", "Default Option 2"])
-        .map((opt: string) => `<SelectItem value="${opt.toLowerCase().replace(/\\s+/g, '_')}">${opt}</SelectItem>`)
-        .join("\n          ");
+      const selectOptions = (field.options || ["Default 1", "Default 2"])
+        .map((opt) => {
+          // For ID fields (now treated as strings) or number fields, handle appropriately
+          const optionValue = (field.zodType === "number" && !isIdField) ? String(opt) : opt;
+          return `<SelectItem value="${optionValue}">${opt}</SelectItem>`;
+        })
+        .join("\n              ");
 
-      control = `<Select onValueChange={field.onChange} defaultValue={field.value}>
-        <FormControl>
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select an option" />
-          </SelectTrigger>
-        </FormControl>
+      // Update onChange logic for ID fields
+      const onChangeLogic = (field.zodType === "number" && !isIdField)
+        ? `(val) => field.onChange(Number(val))`
+        : `field.onChange`;
+
+      const valueLogic = (field.zodType === "number" && !isIdField)
+        ? `String(field.value ?? '')`
+        : `field.value ?? ''`;
+
+      control = `<Select onValueChange={${onChangeLogic}} value={${valueLogic}}>
+        <SelectTrigger className="w-full bg-background" style={{ height: '2.75rem' }}>
+          <SelectValue placeholder="${field.placeholder}" />
+        </SelectTrigger>
         <SelectContent>
           ${selectOptions}
         </SelectContent>
@@ -35,21 +155,17 @@ function generateFormField(field: Field): string {
     case "checkbox":
       return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
         <FormItem className="flex items-center gap-x-3 space-y-0 pt-8">
-            <FormControl>
-              <Checkbox checked={field.value} onCheckedChange={field.onChange} />
-            </FormControl>
-            <div className="space-y-1 leading-none">
-              ${commonLabel}
-            </div>
+          <FormControl>
+            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+          </FormControl>
+          <div className="space-y-1 leading-none">${commonLabel}</div>
         </FormItem>
       )} />`;
 
     case "switch":
       return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
-        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mt-6">
-          <div className="space-y-0.5">
-            <FormLabel>${field.label}</FormLabel>
-          </div>
+        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mt-6 bg-background">
+          <div className="space-y-0.5"><FormLabel>${field.label}</FormLabel></div>
           <FormControl>
             <Switch checked={field.value} onCheckedChange={field.onChange} />
           </FormControl>
@@ -58,134 +174,374 @@ function generateFormField(field: Field): string {
 
     case "radio":
       const radioOptions = (field.options || ["Default A", "Default B"])
-        .map((opt: string) => 
-              `<FormItem className="flex items-center space-x-2 space-y-0">
-          <FormControl><RadioGroupItem value="${opt.toLowerCase().replace(/\\s+/g, '_')}" /></FormControl>
-          <FormLabel className="font-normal">${opt}</FormLabel>
-        </FormItem>`
-            ).join("\n        ");
+        .map(
+          (opt) =>
+            `<FormItem className="flex items-center space-x-2">
+              <FormControl><RadioGroupItem value="${opt.toLowerCase().replace(/\s+/g, "_")}" /></FormControl>
+              <FormLabel className="font-normal">${opt}</FormLabel>
+            </FormItem>`
+        )
+        .join("\n              ");
 
-      control = `<RadioGroup onValueChange={field.onChange} defaultValue={field.value} className="flex space-x-4 pt-2">
+      control = `<RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-4 pt-2">
         ${radioOptions}
       </RadioGroup>`;
       break;
 
     case "file":
-      control = `<Input type="file" />`; // Simplified for basic form
-      break;
+      const capFieldName = capitalize(field.fieldName);
+      return `
+<FormField
+  control={form.control}
+  name="${field.fieldName}"
+  render={() => (
+    <FormItem>
+      ${commonLabel}
+      <FormControl>
+        <div
+          {...getRootPropsFor${capFieldName}()}
+          className={cn(
+            "bg-background flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-0 cursor-pointer transition",
+            is${capFieldName}DragActive ? "border-primary bg-muted" : "border-muted-foreground/25"
+          )}
+        >
+          <input {...getInputPropsFor${capFieldName}()} />
+          <CloudUpload className="text-muted-foreground" />
+          {${field.fieldName}File ? (
+            <div className="flex flex-col items-center text-center mt-4">
+              {${field.fieldName}File.type.startsWith("image/") && 
+                <img src={URL.createObjectURL(${field.fieldName}File)} alt="Preview" className="h-20 w-20 rounded-full object-cover mb-2" />
+              }
+              <p className="text-sm text-foreground">{${field.fieldName}File.name}</p>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground ">Drag & drop a file, or click to select</p>
+          )}
+        </div>
+      </FormControl>
+      <FormMessage />
+    </FormItem>
+  )}
+/>`;
 
     case "color":
-      control = `<Input type="color" {...field} />`;
+      control = `<Input type="color" className="bg-background" style={{ height: '2.75rem' }} {...field} />`;
       break;
 
     case "datepicker":
-      return `<FormField
-        control={form.control}
-        name="${field.fieldName}"
-        render={({ field }) => (
-          <FormItem className="flex flex-col">
-            <FormLabel>${field.label}</FormLabel>
-            <Popover>
-              <PopoverTrigger asChild>
-                <FormControl>
-                  <Button
-                    variant={"outline"}
-                    className={cn(
-                      "w-full pl-3 text-left font-normal",
-                      !field.value && "text-muted-foreground"
-                    )}
-                  >
-                    {field.value ? (
-                      format(field.value, "PPP")
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                    <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                  </Button>
-                </FormControl>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={field.value}
-                  onSelect={field.onChange}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-            <FormMessage />
-          </FormItem>
-        )}
-      />`;
+      return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
+        <FormItem>
+          <FormLabel>${field.label}</FormLabel>
+          <Popover>
+            <PopoverTrigger asChild>
+              <FormControl>
+                <Button variant={"outline"} className={cn(
+                  "w-full bg-background pl-3 text-left font-normal",
+                  !field.value && "text-muted-foreground"
+                )} style={{ height: '2.75rem' }}>
+                  {field.value ? (format(field.value, "PPP")) : (<span>Pick a date</span>)}
+                  <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                </Button>
+              </FormControl>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="start">
+              <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+            </PopoverContent>
+          </Popover>
+          <FormMessage />
+        </FormItem>
+      )} />`;
 
     default:
-      control = `<Input placeholder="${field.placeholder}" {...field} />`;
+      let inputType = "text";
+      if (field.fieldName.toLowerCase().includes("password")) inputType = "password";
+      else if (field.validationRules.some((r) => r.type === "email")) inputType = "email";
+      else if (field.validationRules.some((r) => r.type === "url")) inputType = "url";
+      else if (field.zodType === "number" && !isIdField) inputType = "number";
+      // ID fields will use text input instead of number input
+
+      control = `<Input type="${inputType}" className="bg-background" placeholder="${field.placeholder}" style={{ height: '2.75rem' }} {...field} />`;
   }
 
   return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
     <FormItem>
       ${commonLabel}
-      <FormControl>${control}</FormControl>
+      <FormControl>
+        ${control}
+      </FormControl>
       <FormMessage />
     </FormItem>
   )} />`;
 }
 
-export function generateFormComponent(modelName: string, fields: Field[]): void {
-  const componentName = `${capitalize(modelName)}Form`;
-  const modelDirName = capitalize(modelName);
-  const outputDir = path.join(getBaseDir(), "src", "pages", modelDirName);
-
-  const mainFormFields = fields.map(generateFormField).join("\n\n          ");
-
-  const componentContent = `
-import { useForm } from "react-hook-form";
-import { format } from "date-fns";
-import { CalendarIcon } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-
-export function ${componentName}() {
-  const form = useForm<any>();
-
-  function onSubmit(values: any) {
-    console.log("Form Submitted:", values);
+// --- UPDATED FUNCTION ---
+function generateOnSubmitFunction(modelName: string, fileFields: Field[], isPopup: boolean): string {
+  const typeName = `${capitalize(modelName)}FormValues`;
+  
+  // Logic for forms WITHOUT file uploads (e.g., Role, Brand)
+  if (fileFields.length === 0) {
+    const body = isPopup 
+      ? `    onSubmit(values);`
+      : `    console.log("Form Submitted (JSON):", values);\n    // TODO: Implement your submission logic here.`;
+    return `  function ${isPopup ? 'handleFormSubmit' : 'onSubmit'}(values: ${typeName}) {\n${body}\n  }`;
   }
 
-  return (
-    <div className="w-full bg-card border rounded-xl shadow-sm">
-      <div className="p-6 md:p-8 border-b">
-        <h1 className="text-2xl font-bold text-foreground">Manage ${capitalize(modelName)}</h1>
-      </div>
+  // Logic for forms WITH file uploads (e.g., User)
+  const formDataLogic = fileFields.map(field => `
+    if (${field.fieldName}File) {
+      formData.append("${field.fieldName}", ${field.fieldName}File);
+    } else if (values.${field.fieldName}) {
+      formData.append("${field.fieldName}", values.${field.fieldName});
+    }`).join('');
+
+  // --- THIS IS THE FIX ---
+  // Update the 'body' for non-popup forms to provide a clear log.
+  const body = isPopup 
+    ? `    onSubmit(formData);`
+    : `    console.log("Form Submitted (FormData):");
+  for (const [key, value] of formData.entries()) {
+    console.log(key, value);
+  }
+  // TODO: Implement your FormData submission logic here (e.g., apiService.post('/users', formData)).`;
+
+  return `  function ${isPopup ? 'handleFormSubmit' : 'onSubmit'}(values: ${typeName}) {
+    const formData = new FormData();
+    for (const key in values) {
+      const value = values[key as keyof typeof values];
+      if (${fileFields.map(f => `key === '${f.fieldName}'`).join(' || ')}) continue;
+      if (value instanceof Date) {
+        formData.append(key, value.toISOString());
+      } else if (value !== null && value !== undefined) {
+        formData.append(key, String(value));
+      }
+    }
+    ${formDataLogic}
+    ${body}
+  }`;
+}
+
+// --- MAIN GENERATOR FUNCTION ---
+
+export function generateFormComponent(modelName: string, modelConfig: ModelConfig): void {
+  const componentName = `${capitalize(modelName)}Form`;
+  const outputDir = modelConfig.isPopup ? path.join(getBaseDir(), "src", "components", "forms") : path.join(getBaseDir(), "src", "pages", capitalize(modelName));
+
+  const hasDatePicker = modelConfig.fields.some((f) => f.uiType === "datepicker");
+  const hasFileUpload = modelConfig.fields.some((f) => f.uiType === "file");
+  const hasPassword = modelConfig.fields.some(f => f.fieldName.toLowerCase().includes("password"));
+
+  const zodSchemaFields = modelConfig.fields.map((f) => `  ${f.fieldName}: ${generateZodValidation(f)}`).join(",\n");
+  const defaultValues = modelConfig.fields.map((f) => `    ${f.fieldName}: ${generateDefaultValue(f)}`).join(",\n");
+
+  const componentContent = modelConfig.isPopup
+    ? generatePopupFormComponent(modelName, componentName, zodSchemaFields, defaultValues, modelConfig.fields, hasDatePicker, hasFileUpload, hasPassword)
+    : generateRegularFormComponent(modelName, componentName, zodSchemaFields, defaultValues, modelConfig.fields, hasDatePicker, hasFileUpload, hasPassword);
+
+  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+  fs.writeFileSync(path.join(outputDir, `${componentName}.tsx`), componentContent, "utf8");
+  console.log(`✅ Generated ${modelConfig.isPopup ? "Popup Form" : "Page Form"} for ${modelName} at: ${path.join(outputDir, `${componentName}.tsx`)}`);
+}
+
+// --- TEMPLATE GENERATORS ---
+
+function generatePopupFormComponent(modelName: string, componentName: string, zodSchema: string, defaultValues: string, fields: Field[], hasDatePicker: boolean, hasFileUpload: boolean, hasPassword: boolean): string {
+    const typeName = `${capitalize(modelName)}FormValues`;
+    const fileFields = fields.filter(f => f.uiType === 'file');
+  
+    const mainFormFields = fields.map(field => {
+      const fieldJsx = generateFormField(field);
+      if (field.isRemoveInEditForm) {
+        return `          {!initialData?.id && (\n            <>${fieldJsx}</>\n          )}`;
+      }
+      return `          ${fieldJsx}`;
+    }).join("\n\n");
+  
+    const lucideIcons = [];
+    if (hasFileUpload) lucideIcons.push('CloudUpload');
+    if (hasDatePicker) lucideIcons.push('CalendarIcon');
+    if (hasPassword) {
+        lucideIcons.push('Eye');
+        lucideIcons.push('EyeOff');
+    }
+
+    const imports = [
+      `import { useForm } from "react-hook-form";`,
+      `import { zodResolver } from "@hookform/resolvers/zod";`,
+      `import * as z from "zod";`,
+      (hasFileUpload || hasPassword) && `import { useState } from "react";`,
+      hasFileUpload && `import { useDropzone } from "react-dropzone";`,
+      hasDatePicker && `import { format } from "date-fns";`,
+      lucideIcons.length > 0 && `import { ${lucideIcons.join(', ')} } from "lucide-react";`,
+      hasDatePicker && `import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";`,
+      hasDatePicker && `import { Calendar } from "@/components/ui/calendar";`,
+      `import { cn } from "@/lib/utils";`,
+      `import { Button } from "@/components/ui/button";`,
+      `import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";`,
+      `import { Input } from "@/components/ui/input";`,
+      `import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";`,
+      `import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";`,
+      `import { Checkbox } from "@/components/ui/checkbox";`,
+      `import { Switch } from "@/components/ui/switch";`,
+      `import { Textarea } from "@/components/ui/textarea";`,
+    ].filter(Boolean).join('\n');
+  
+    const stateHooks = fileFields.map(f => `  const [${f.fieldName}File, set${capitalize(f.fieldName)}File] = useState<File | null>(null);`).join('\n');
+    const passwordStateHook = hasPassword ? `  const [showPassword, setShowPassword] = useState(false);` : "";
+    const dropzoneHooks = fileFields.map(f => `
+  const { getRootProps: getRootPropsFor${capitalize(f.fieldName)}, getInputProps: getInputPropsFor${capitalize(f.fieldName)}, isDragActive: is${capitalize(f.fieldName)}DragActive } = useDropzone({
+    accept: { "image/*": [] }, // Consider making this configurable
+    multiple: false,
+    onDrop: (acceptedFiles) => {
+      const file = acceptedFiles[0];
+      if (file) {
+        set${capitalize(f.fieldName)}File(file);
+        form.setValue("${f.fieldName}", file as any);
+      }
+    },
+  });`).join('\n');
+  
+    return `${imports}
+  
+  const ${modelName}Schema = z.object({
+  ${zodSchema}
+  });
+  
+  type ${typeName} = z.infer<typeof ${modelName}Schema>;
+  
+  interface ${componentName}Props {
+    initialData?: Partial<${typeName}> & { id?: any };
+    onSubmit: (values: ${typeName} | FormData) => void;
+    onCancel: () => void;
+    isLoading?: boolean;
+  }
+  
+  export function ${componentName}({ initialData, onSubmit, onCancel, isLoading = false }: ${componentName}Props) {
+  ${stateHooks}
+  ${passwordStateHook}
+    const form = useForm<${typeName}>({
+      resolver: zodResolver(${modelName}Schema),
+      defaultValues: {
+  ${defaultValues},
+        ...initialData,
+      },
+    });
+  ${dropzoneHooks}
+  
+    ${generateOnSubmitFunction(modelName, fileFields, true)}
+  
+    return (
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 md:p-8 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-8">
-            ${mainFormFields}
+        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  ${mainFormFields}
           </div>
-          <div className="flex justify-end pt-4">
-            <Button type="submit" size="lg">Save Changes</Button>
+          <div className="flex justify-end gap-2 pt-4">
+            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>Cancel</Button>
+            <Button type="submit" disabled={isLoading}>{isLoading ? "Saving..." : "Save"}</Button>
           </div>
         </form>
       </Form>
-    </div>
-  );
-}
-`;
-
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
+    );
+  }`;
   }
+  
+  function generateRegularFormComponent(modelName: string, componentName: string, zodSchema: string, defaultValues: string, fields: Field[], hasDatePicker: boolean, hasFileUpload: boolean, hasPassword: boolean): string {
+    const typeName = `${capitalize(modelName)}FormValues`;
+    const fileFields = fields.filter(f => f.uiType === 'file');
+  
+    const mainFormFields = fields.map(field => {
+      const fieldJsx = generateFormField(field);
+      if (field.isRemoveInEditForm) {
+        return `            {!id && (\n              <>${fieldJsx}</>\n            )}`;
+      }
+      return `            ${fieldJsx}`;
+    }).join("\n\n");
+  
+    const lucideIcons = [];
+    if (hasFileUpload) lucideIcons.push('CloudUpload');
+    if (hasDatePicker) lucideIcons.push('CalendarIcon');
+    if (hasPassword) {
+        lucideIcons.push('Eye');
+        lucideIcons.push('EyeOff');
+    }
 
-  const newFilePath = path.join(outputDir, `${componentName}.tsx`);
-  fs.writeFileSync(newFilePath, componentContent, "utf8");
-  console.log(`✅ Generated Form for ${modelName} at: ${newFilePath}`);
-}
+    const imports = [
+      `import { useForm } from "react-hook-form";`,
+      `import { zodResolver } from "@hookform/resolvers/zod";`,
+      `import * as z from "zod";`,
+      `import { useParams } from "react-router-dom";`,
+      (hasFileUpload || hasPassword) && `import { useState } from "react";`,
+      hasFileUpload && `import { useDropzone } from "react-dropzone";`,
+      hasDatePicker && `import { format } from "date-fns";`,
+      lucideIcons.length > 0 && `import { ${lucideIcons.join(', ')} } from "lucide-react";`,
+      hasDatePicker && `import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";`,
+      hasDatePicker && `import { Calendar } from "@/components/ui/calendar";`,
+      `import { cn } from "@/lib/utils";`,
+      `import { Button } from "@/components/ui/button";`,
+      `import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";`,
+      `import { Input } from "@/components/ui/input";`,
+      `import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";`,
+      `import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";`,
+      `import { Checkbox } from "@/components/ui/checkbox";`,
+      `import { Switch } from "@/components/ui/switch";`,
+      `import { Textarea } from "@/components/ui/textarea";`,
+    ].filter(Boolean).join('\n');
+    
+    const stateHooks = fileFields.map(f => `  const [${f.fieldName}File, set${capitalize(f.fieldName)}File] = useState<File | null>(null);`).join('\n');
+    const passwordStateHook = hasPassword ? `  const [showPassword, setShowPassword] = useState(false);` : "";
+    const dropzoneHooks = fileFields.map(f => `
+  const { getRootProps: getRootPropsFor${capitalize(f.fieldName)}, getInputProps: getInputPropsFor${capitalize(f.fieldName)}, isDragActive: is${capitalize(f.fieldName)}DragActive } = useDropzone({
+    accept: { "image/*": [] }, // Consider making this configurable
+    multiple: false,
+    onDrop: (acceptedFiles) => {
+      const file = acceptedFiles[0];
+      if (file) {
+        set${capitalize(f.fieldName)}File(file);
+        form.setValue("${f.fieldName}", file as any);
+      }
+    },
+  });`).join('\n');
+  
+    return `${imports}
+  
+  const ${modelName}Schema = z.object({
+  ${zodSchema}
+  });
+  
+  type ${typeName} = z.infer<typeof ${modelName}Schema>;
+  
+  export function ${componentName}() {
+    const { id } = useParams<{ id: string }>();
+  ${stateHooks}
+  ${passwordStateHook}
+  
+    const form = useForm<${typeName}>({
+      resolver: zodResolver(${modelName}Schema),
+      defaultValues: {
+  ${defaultValues}
+        // TODO: Fetch and populate initialData for edit pages
+      },
+    });
+  ${dropzoneHooks}
+  
+    ${generateOnSubmitFunction(modelName, fileFields, false)}
+  
+    return (
+      <div className="w-full bg-card border rounded-xl shadow-sm">
+        <div className="p-6 md-p-8 border-b">
+          <h1 className="text-2xl font-bold text-foreground">{id ? 'Edit' : 'Create'} ${capitalize(modelName)}</h1>
+        </div>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 md:p-8 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-8">
+  ${mainFormFields}
+            </div>
+            <div className="flex justify-end pt-4">
+              <Button type="submit" size="lg">Save Changes</Button>
+            </div>
+          </form>
+        </Form>
+      </div>
+    );
+  }`;
+  }
