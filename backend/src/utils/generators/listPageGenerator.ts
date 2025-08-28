@@ -4,6 +4,7 @@ import { Field, ModelConfig } from "../excelParser";
 
 const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
 const sanitizeFieldName = (name: string): string =>
   name.replace(/[^a-zA-Z0-9_]/g, "_");
 function mapToTsType(zodType: Field["zodType"]): string {
@@ -117,7 +118,7 @@ export function ${componentName}() {
   const handleFormSubmit = (values: any) => {
     console.log("Form submitted from drawer:", values);
     // TODO: Add logic to either create or update the data
-    setIsDrawerOpen(false); // Close drawer on submit
+    setIsDrawerOpen(false);
   };
   `
       : ""
@@ -130,16 +131,15 @@ export function ${componentName}() {
   const columns: ColumnDef<${modelTypeName}>[] = React.useMemo(() => [
     { id: "select", header: ({ table }) => <Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={v => table.toggleAllPageRowsSelected(!!v)} />, cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={v => row.toggleSelected(!!v)} />, enableSorting: false },
     ${fieldsForListing
-      .map(
-        (field) => `{ 
+      .map((field) => {
+        const displayKey = field.fieldName.endsWith("_id") ? field.fieldName.replace(/_id$/, "") : field.fieldName;
+        return `{ 
       accessorKey: "${sanitizeFieldName(field.fieldName)}", 
-      header: ({ column }) => (${
-        field.sortable
-          ? `<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>${field.label}<ArrowUpDown className="ml-2 h-4 w-4" /></Button>`
-          : `<span>${field.label}</span>`
+      header: ({ column }) => (${field.sortable
+        ? `<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>{t("${singleModel}.fields.${displayKey}")}<ArrowUpDown className="ml-2 h-4 w-4" /></Button>`
+        : `<span>{t("models.${singleModel}.fields.${displayKey}")}</span>`})
+    }`;
       })
-    }`
-      )
       .join(",\n    ")},
     { id: "actions", header: () => <div className="text-right">{t('common.actions')}</div>, cell: ({ row }) => (<div className="flex items-center justify-end gap-1">
       <Button variant="ghost" size="icon" title={t('common.view')} onClick={() => setViewingRow(row.original)}><Eye className="h-4 w-4" /></Button>
@@ -191,14 +191,12 @@ export function ${componentName}() {
           <DialogHeader className="p-6 pb-4"><DialogTitle>{t('form.viewTitle', { model: t('models.${singleModel}') })}</DialogTitle></DialogHeader>
           <div className="border-y"><div className="grid auto-rows-min gap-y-4 p-6">
             ${fieldsForDialog
-              .map(
-                (field) =>
-                  `<div className="grid grid-cols-2 items-start gap-x-4"><span className="text-muted-foreground">${
-                    field.label
-                  }</span><p className="font-medium">{String(viewingRow?.${sanitizeFieldName(
-                    field.fieldName
-                  )} ?? '')}</p></div>`
-              )
+              .map((field) => {
+                const displayKey = field.fieldName.endsWith("_id") ? field.fieldName.replace(/_id$/, "") : field.fieldName;
+                return `<div className="grid grid-cols-2 items-start gap-x-4"><span className="text-muted-foreground">{t("${singleModel}.fields.${displayKey}")}</span><p className="font-medium">{String(viewingRow?.${sanitizeFieldName(
+                  field.fieldName
+                )} ?? '')}</p></div>`;
+              })
               .join("")}
           </div></div>
           <DialogFooter className="sm:justify-end gap-2 p-6 pt-4"><Button variant="outline" onClick={() => setViewingRow(null)}>{t('common.cancel')}</Button><Button asChild><Link to={\`/${singleModel}/edit/\${viewingRow?.id}\`}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</Link></Button></DialogFooter>
@@ -213,7 +211,6 @@ export function ${componentName}() {
         isPopup
           ? `
       <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen} direction="right">
-        {/* --- UPDATED: Drawer width increased from 500px to 720px --- */}
         <DrawerContent className="w-[500px] ml-auto h-full">
           <DrawerHeader>
             <DrawerTitle>{editingRow ? t('form.editTitle', { model: t('models.${singleModel}') }) : t('form.createTitle', { model: t('models.${singleModel}') })}</DrawerTitle>

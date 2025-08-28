@@ -7,8 +7,9 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // --- HELPER FUNCTIONS ---
 
-function generateZodValidation(field: Field): string {
+function generateZodValidation(field: Field, modelName: string): string {
   let zodChain = "";
+  const singleModel = modelName.toLowerCase();
   
   // Check if this is an ID field and override the zodType to string
   const isIdField = field.fieldName.toLowerCase().includes('id') || field.fieldName.toLowerCase().endsWith('_id');
@@ -35,43 +36,52 @@ function generateZodValidation(field: Field): string {
   }
 
   field.validationRules.forEach((rule) => {
-    switch (rule.type) {
+    const displayKey = isIdField ? field.fieldName.replace(/_id$/, "") : field.fieldName;
+    const translationKey = `t("${singleModel}.validation.${displayKey}${capitalize(rule.type)}")`;
+        switch (rule.type) {
       case "required":
         if (field.zodType === "string" || isIdField) {
-          zodChain += `.min(1, { message: "${rule.message}" })`;
+          zodChain += `.min(1, { message: ${translationKey} })`;
+        }
+        if (field.zodType === "date") {
+          zodChain = `z.date({ required_error: ${translationKey} })`;
         }
         if (field.zodType === "any") {
-          zodChain += `.refine(file => file, { message: "${rule.message}" })`;
+          zodChain += `.refine((file) => file, { message: ${translationKey} })`;
         }
         break;
       case "minLength":
         if (field.zodType === "string" || isIdField) {
-          zodChain += `.min(${rule.value}, { message: "${rule.message}" })`;
+          const minTranslationKey = `t("${singleModel}.validation.${field.fieldName}Min")`;
+          zodChain += `.min(${rule.value}, { message: ${minTranslationKey} })`;
         }
         break;
       case "maxLength":
         if (field.zodType === "string" || isIdField) {
-          zodChain += `.max(${rule.value}, { message: "${rule.message}" })`;
+          const maxTranslationKey = `t("${singleModel}.validation.${field.fieldName}Max")`;
+          zodChain += `.max(${rule.value}, { message: ${maxTranslationKey} })`;
         }
         break;
       case "min":
         if (field.zodType === "number" && !isIdField) {
-          zodChain += `.min(${rule.value}, { message: "${rule.message}" })`;
+          zodChain += `.min(${rule.value}, { message: ${translationKey} })`;
         }
         break;
       case "max":
         if (field.zodType === "number" && !isIdField) {
-          zodChain += `.max(${rule.value}, { message: "${rule.message}" })`;
+          zodChain += `.max(${rule.value}, { message: ${translationKey} })`;
         }
         break;
       case "email":
         if (field.zodType === "string") {
-          zodChain += `.email({ message: "${rule.message}" })`;
+          const emailTranslationKey = `t("${singleModel}.validation.${field.fieldName}Invalid")`;
+          zodChain += `.email({ message: ${emailTranslationKey} })`;
         }
         break;
       case "url":
         if (field.zodType === "string") {
-          zodChain += `.url({ message: "${rule.message}" })`;
+          const urlTranslationKey = `t("${singleModel}.validation.${field.fieldName}Invalid")`;
+          zodChain += `.url({ message: ${urlTranslationKey} })`;
         }
         break;
     }
@@ -85,11 +95,15 @@ function generateZodValidation(field: Field): string {
     field.required &&
     !field.validationRules.some((r) => r.type === "required")
   ) {
+    const requiredTranslationKey = `t("${singleModel}.validation.${field.fieldName}Required")`;
     if (field.zodType === "string" || isIdField) {
-      zodChain += `.min(1, "${field.label} is required")`;
+      zodChain += `.min(1, { message: ${requiredTranslationKey} })`;
+    }
+    if (field.zodType === "date") {
+      zodChain = `z.date({ required_error: ${requiredTranslationKey} })`;
     }
     if (field.zodType === "any") {
-      zodChain += `.refine(file => file, { message: "${field.label} is required." })`;
+      zodChain += `.refine((file) => file, { message: ${requiredTranslationKey} })`;
     }
   }
   if (
@@ -113,14 +127,16 @@ function generateDefaultValue(field: Field): string {
   return '""';
 }
 
-function generateFormField(field: Field): string {
-  const commonLabel = `<FormLabel>${field.label}</FormLabel>`;
+function generateFormField(field: Field, modelName: string): string {
+  const singleModel = modelName.toLowerCase();
   const isIdField = field.fieldName.toLowerCase().includes('id') || field.fieldName.toLowerCase().endsWith('_id');
+  const displayKey = isIdField ? field.fieldName.replace(/_id$/, "") : field.fieldName;
+  const commonLabel = `<FormLabel>{t("${singleModel}.fields.${displayKey}")}</FormLabel>`;
   let control: string;
 
   switch (field.uiType) {
     case "textarea":
-      control = `<Textarea className="bg-background" placeholder="${field.placeholder}" {...field} />`;
+      control = `<Textarea className="bg-background" placeholder={t("${singleModel}.placeholders.${displayKey}")} {...field} />`;
       break;
 
     case "select":
@@ -143,7 +159,7 @@ function generateFormField(field: Field): string {
 
       control = `<Select onValueChange={${onChangeLogic}} value={${valueLogic}}>
         <SelectTrigger className="w-full bg-background" style={{ height: '2.75rem' }}>
-          <SelectValue placeholder="${field.placeholder}" />
+          <SelectValue placeholder={t("${singleModel}.placeholders.${displayKey}")} />
         </SelectTrigger>
         <SelectContent>
           ${selectOptions}
@@ -164,7 +180,7 @@ function generateFormField(field: Field): string {
     case "switch":
       return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
         <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mt-6 bg-background">
-          <div className="space-y-0.5"><FormLabel>${field.label}</FormLabel></div>
+          <div className="space-y-0.5">${commonLabel}</div>
           <FormControl>
             <Switch checked={field.value} onCheckedChange={field.onChange} />
           </FormControl>
@@ -173,13 +189,14 @@ function generateFormField(field: Field): string {
 
     case "radio":
       const radioOptions = (field.options || ["Default A", "Default B"])
-        .map(
-          (opt) =>
-            `<FormItem className="flex items-center space-x-2">
-              <FormControl><RadioGroupItem value="${opt.toLowerCase().replace(/\s+/g, "_")}" /></FormControl>
-              <FormLabel className="font-normal">${opt}</FormLabel>
-            </FormItem>`
-        )
+        .map((opt) => {
+          const optionKey = opt.toLowerCase().replace(/\s+/g, "");
+          const optionValue = opt.toLowerCase().replace(/\s+/g, "_");
+          return `<FormItem className="flex items-center space-x-2">
+              <FormControl><RadioGroupItem value="${optionValue}" /></FormControl>
+              <FormLabel className="font-normal">{t("${singleModel}.options.${optionKey}") ?? "${opt}"}</FormLabel>
+            </FormItem>`;
+        })
         .join("\n              ");
 
       control = `<RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-4 pt-2">
@@ -230,7 +247,7 @@ function generateFormField(field: Field): string {
     case "datepicker":
       return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
         <FormItem>
-          <FormLabel>${field.label}</FormLabel>
+          ${commonLabel}
           <Popover>
             <PopoverTrigger asChild>
               <FormControl>
@@ -259,7 +276,7 @@ function generateFormField(field: Field): string {
       else if (field.zodType === "number" && !isIdField) inputType = "number";
       // ID fields will use text input instead of number input
 
-      control = `<Input type="${inputType}" className="bg-background" placeholder="${field.placeholder}" style={{ height: '2.75rem' }} {...field} />`;
+      control = `<Input type="${inputType}" className="bg-background" placeholder={t("${singleModel}.placeholders.${displayKey}")} style={{ height: '2.75rem' }} {...field} />`;
   }
 
   return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
@@ -298,10 +315,9 @@ function generateOnSubmitFunction(modelName: string, fileFields: Field[], isPopu
   const body = isPopup 
     ? `    onSubmit(formData);`
     : `    console.log("Form Submitted (FormData):");
-  for (const [key, value] of formData.entries()) {
-    console.log(key, value);
-  }
-  // TODO: Implement your FormData submission logic here (e.g., apiService.post('/users', formData)).`;
+    for (const [key, value] of formData.entries()) {
+      console.log(key, value);
+    }`;
 
   return `  function ${isPopup ? 'handleFormSubmit' : 'onSubmit'}(values: ${typeName}) {
     const formData = new FormData();
@@ -313,8 +329,8 @@ function generateOnSubmitFunction(modelName: string, fileFields: Field[], isPopu
       } else if (value !== null && value !== undefined) {
         formData.append(key, String(value));
       }
-    }
-    ${formDataLogic}
+    }${formDataLogic}
+
     ${body}
   }`;
 }
@@ -329,8 +345,8 @@ export function generateFormComponent(modelName: string, modelConfig: ModelConfi
   const hasFileUpload = modelConfig.fields.some((f) => f.uiType === "file");
   const hasPassword = modelConfig.fields.some(f => f.fieldName.toLowerCase().includes("password"));
 
-  const zodSchemaFields = modelConfig.fields.map((f) => `  ${f.fieldName}: ${generateZodValidation(f)}`).join(",\n");
-  const defaultValues = modelConfig.fields.map((f) => `    ${f.fieldName}: ${generateDefaultValue(f)}`).join(",\n");
+  const zodSchemaFields = modelConfig.fields.map((f) => `    ${f.fieldName}: ${generateZodValidation(f, modelName)}`).join(",\n");
+  const defaultValues = modelConfig.fields.map((f) => `      ${f.fieldName}: ${generateDefaultValue(f)}`).join(",\n");
 
   const componentContent = modelConfig.isPopup
     ? generatePopupFormComponent(modelName, componentName, zodSchemaFields, defaultValues, modelConfig.fields, hasDatePicker, hasFileUpload, hasPassword)
@@ -345,10 +361,11 @@ export function generateFormComponent(modelName: string, modelConfig: ModelConfi
 
 function generatePopupFormComponent(modelName: string, componentName: string, zodSchema: string, defaultValues: string, fields: Field[], hasDatePicker: boolean, hasFileUpload: boolean, hasPassword: boolean): string {
     const typeName = `${capitalize(modelName)}FormValues`;
+    const singleModel = modelName.toLowerCase();
     const fileFields = fields.filter(f => f.uiType === 'file');
   
     const mainFormFields = fields.map(field => {
-      const fieldJsx = generateFormField(field);
+      const fieldJsx = generateFormField(field, modelName);
       if (field.isRemoveInEditForm) {
         return `          {!initialData?.id && (\n            <>${fieldJsx}</>\n          )}`;
       }
@@ -389,7 +406,7 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
     const passwordStateHook = hasPassword ? `  const [showPassword, setShowPassword] = useState(false);` : "";
     const dropzoneHooks = fileFields.map(f => `
   const { getRootProps: getRootPropsFor${capitalize(f.fieldName)}, getInputProps: getInputPropsFor${capitalize(f.fieldName)}, isDragActive: is${capitalize(f.fieldName)}DragActive } = useDropzone({
-    accept: { "image/*": [] }, // Consider making this configurable
+    accept: { "image/*": [] },
     multiple: false,
     onDrop: (acceptedFiles) => {
       const file = acceptedFiles[0];
@@ -401,49 +418,52 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
   });`).join('\n');
   
     return `${imports}
-  
-  const ${modelName}Schema = z.object({
-  ${zodSchema}
+
+// Schema with translated error messages
+const ${capitalize(modelName)}Schema = (t: any) =>
+  z.object({
+${zodSchema}
   });
-  
-  type ${typeName} = z.infer<typeof ${modelName}Schema>;
-  
-  interface ${componentName}Props {
-    initialData?: Partial<${typeName}> & { id?: any };
-    onSubmit: (values: ${typeName} | FormData) => void;
-    onCancel: () => void;
-    isLoading?: boolean;
-  }
-  
-  export function ${componentName}({ initialData, onSubmit, onCancel, isLoading = false }: ${componentName}Props) {
-    const { t } = useTranslation();
-  ${stateHooks}
-  ${passwordStateHook}
-    const form = useForm<${typeName}>({
-      resolver: zodResolver(${modelName}Schema),
-      defaultValues: {
-  ${defaultValues},
-        ...initialData,
-      },
-    });
-  ${dropzoneHooks}
-  
-    ${generateOnSubmitFunction(modelName, fileFields, true)}
-  
-    return (
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-  ${mainFormFields}
-          </div>
-          <div className="flex justify-end gap-2 pt-4">
-            <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>{t('common.cancel')}</Button>
-            <Button type="submit" disabled={isLoading}>{isLoading ? t('common.saving') : t('common.save')}</Button>
-          </div>
-        </form>
-      </Form>
-    );
-  }`;
+
+type ${typeName} = z.infer<ReturnType<typeof ${capitalize(modelName)}Schema>>;
+
+interface ${componentName}Props {
+  initialData?: Partial<${typeName}> & { id?: any };
+  onSubmit: (values: ${typeName} | FormData) => void;
+  onCancel: () => void;
+  isLoading?: boolean;
+}
+
+export function ${componentName}({ initialData, onSubmit, onCancel, isLoading = false }: ${componentName}Props) {
+  const { t } = useTranslation();
+${stateHooks}
+${passwordStateHook}
+
+  const form = useForm<${typeName}>({
+    resolver: zodResolver(${capitalize(modelName)}Schema(t)),
+    defaultValues: {
+${defaultValues},
+      ...initialData,
+    },
+  });
+${dropzoneHooks}
+
+  ${generateOnSubmitFunction(modelName, fileFields, true)}
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+${mainFormFields}
+        </div>
+        <div className="flex justify-end gap-2 pt-4">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>{t('common.cancel')}</Button>
+          <Button type="submit" disabled={isLoading}>{isLoading ? t('common.saving') : t('common.save')}</Button>
+        </div>
+      </form>
+    </Form>
+  );
+}`;
   }
   
   function generateRegularFormComponent(modelName: string, componentName: string, zodSchema: string, defaultValues: string, fields: Field[], hasDatePicker: boolean, hasFileUpload: boolean, hasPassword: boolean): string {
@@ -452,7 +472,7 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
     const fileFields = fields.filter(f => f.uiType === 'file');
   
     const mainFormFields = fields.map(field => {
-      const fieldJsx = generateFormField(field);
+      const fieldJsx = generateFormField(field, modelName);
       if (field.isRemoveInEditForm) {
         return `            {!id && (\n              <>${fieldJsx}</>\n            )}`;
       }
@@ -493,61 +513,64 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
     const stateHooks = fileFields.map(f => `  const [${f.fieldName}File, set${capitalize(f.fieldName)}File] = useState<File | null>(null);`).join('\n');
     const passwordStateHook = hasPassword ? `  const [showPassword, setShowPassword] = useState(false);` : "";
     const dropzoneHooks = fileFields.map(f => `
-  const { getRootProps: getRootPropsFor${capitalize(f.fieldName)}, getInputProps: getInputPropsFor${capitalize(f.fieldName)}, isDragActive: is${capitalize(f.fieldName)}DragActive } = useDropzone({
-    accept: { "image/*": [] }, // Consider making this configurable
-    multiple: false,
-    onDrop: (acceptedFiles) => {
-      const file = acceptedFiles[0];
-      if (file) {
-        set${capitalize(f.fieldName)}File(file);
-        form.setValue("${f.fieldName}", file as any);
+  const { getRootProps: getRootPropsFor${capitalize(f.fieldName)}, getInputProps: getInputPropsFor${capitalize(f.fieldName)}, isDragActive: is${capitalize(f.fieldName)}DragActive } =
+    useDropzone({
+      accept: { "image/*": [] },
+      multiple: false,
+      onDrop: (acceptedFiles) => {
+        const file = acceptedFiles[0];
+        if (file) {
+          set${capitalize(f.fieldName)}File(file);
+          form.setValue("${f.fieldName}", file as any);
+        }
       }
-    },
-  });`).join('\n');
+    });`).join('\n');
   
     return `${imports}
-  
-  const ${modelName}Schema = z.object({
-  ${zodSchema}
+
+// Schema with translated error messages
+const ${capitalize(modelName)}Schema = (t: any) =>
+  z.object({
+${zodSchema}
   });
-  
-  type ${typeName} = z.infer<typeof ${modelName}Schema>;
-  
-  export function ${componentName}() {
-    const { id } = useParams<{ id: string }>();
-    const { t } = useTranslation();
-  ${stateHooks}
-  ${passwordStateHook}
-  
-    const form = useForm<${typeName}>({
-      resolver: zodResolver(${modelName}Schema),
-      defaultValues: {
-  ${defaultValues}
-        // TODO: Fetch and populate initialData for edit pages
-      },
-    });
-  ${dropzoneHooks}
-  
-    ${generateOnSubmitFunction(modelName, fileFields, false)}
-  
-    return (
-      <div className="w-full bg-card border rounded-xl shadow-sm">
-        <div className="p-6 md-p-8 border-b">
-          <h1 className="text-2xl font-bold text-foreground">
-            {id ? t('form.editTitle', { model: t('models.${singleModel}') }) : t('form.createTitle', { model: t('models.${singleModel}') })}
-          </h1>
-        </div>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 md:p-8 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-8">
-  ${mainFormFields}
-            </div>
-            <div className="flex justify-end pt-4">
-              <Button type="submit" size="lg">{t('common.save')}</Button>
-            </div>
-          </form>
-        </Form>
+
+type ${typeName} = z.infer<ReturnType<typeof ${capitalize(modelName)}Schema>>;
+
+export function ${componentName}() {
+  const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
+${stateHooks}
+${passwordStateHook}
+
+  const form = useForm<${typeName}>({
+    resolver: zodResolver(${capitalize(modelName)}Schema(t)),
+    defaultValues: {
+${defaultValues}
+    }
+  });
+${dropzoneHooks}
+
+  ${generateOnSubmitFunction(modelName, fileFields, false)}
+
+  return (
+    <div className="w-full bg-card border rounded-xl shadow-sm">
+      <div className="p-6 md-p-8 border-b">
+        <h1 className="text-2xl font-bold text-foreground">
+          {id ? t("form.editTitle", { model: t("models.${singleModel}") }) : t("form.createTitle", { model: t("models.${singleModel}") })}
+        </h1>
       </div>
-    );
-  }`;
-  }
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 md:p-8 space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-8">
+${mainFormFields}
+          </div>
+
+          <div className="flex justify-end pt-4">
+            <Button type="submit" size="lg">{t("common.save")}</Button>
+          </div>
+        </form>
+      </Form>
+    </div>
+  );
+}`
+    }
