@@ -1,56 +1,44 @@
-// src/utils/generators/sidebarGenerator.ts
 import fs from "fs";
 import path from "path";
-// UPDATED: Import the ModelConfig to understand the full model structure
 import { ModelConfig } from "../excelParser";
 
 const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-// UPDATED: The function now accepts the entire 'models' object, not just an array of names
 export function generateSidebar(models: Record<string, ModelConfig>): void {
   const dir = path.join(getBaseDir(), "src", "components", "layout");
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  // UPDATED: The logic to build navItems is now aware of the 'isPopup' flag
-  const navItems = [
-    { label: "Dashboard", href: "/", icon: "Home" },
-    ...Object.entries(models).map(([name, config]) => {
-        const lower = name.toLowerCase();
-        
-        // If it's a popup, the "Create" link goes to the list page with a special parameter.
-        // Otherwise, it goes to the dedicated create page.
-        const createHref = config.isPopup 
-            ? `/${lower}s?action=create` 
-            : `/${lower}/create`;
-            
-        return {
-            label: capitalize(name),
-            icon: "Users",
-            children: [
-                {
-                label: `All ${capitalize(name)}`,
-                href: `/${name.toLowerCase()}s`,
-                },
-                {
-                label: `Create ${capitalize(name)}`,
-                href: createHref,
-                }
-            ]
+  const modelEntries = Object.entries(models).map(([name, config]) => {
+    const lower = name.toLowerCase();
+    const createHref = config.isPopup ? `/${lower}s?action=create` : `/${lower}/create`;
+    return `{
+      label: t('models.${lower}_plural'),
+      modelKey: '${lower}',
+      icon: "Users", // This can be made dynamic later
+      children: [
+        {
+          label: t('sidebar.allModels', { model: t('models.${lower}_plural') }),
+          href: \`/${lower}s\`,
+        },
+        {
+          label: t('sidebar.createModel', { model: t('models.${lower}') }),
+          href: '${createHref}',
         }
-    })
-  ];
+      ]
+    }`;
+  });
 
   const content = `
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import { Home, Users, Settings, ChevronLeft, ChevronRight, ChevronDown, Circle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 const iconMap: { [key: string]: React.ElementType } = { Home, Users, Settings };
-const navItems = ${JSON.stringify(navItems, null, 2)};
 
 // UPDATED: The active link check now ignores URL parameters like '?action=create'
 const isLinkActive = (item: any, pathname: string): boolean => {
@@ -97,7 +85,6 @@ const NavMenu: React.FC<{ items: any[]; pathname: string; isOpen: boolean }> = (
                   to={child.href}
                   className={cn(
                     "flex items-center gap-3 p-2 rounded-md transition-colors text-gray-400 hover:text-white hover:bg-gray-800",
-                    // Also updated this check to ignore URL parameters
                     pathname === child.href.split('?')[0] ? "text-white font-semibold" : ""
                   )}
                 >
@@ -133,7 +120,13 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, setIsOpen, isMobile }: SidebarProps) {
   const location = useLocation();
+  const { t } = useTranslation();
   const onToggle = () => setIsOpen(!isOpen);
+
+  const navItems = React.useMemo(() => [
+    { label: t('common.dashboard'), href: "/", icon: "Home" },
+    ...[${modelEntries.join(',\n    ')}]
+  ], [t]);
 
   if (isMobile) {
     return (
@@ -142,7 +135,7 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }: SidebarProps) {
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}>
           <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-            <span className="font-bold text-lg">Admin Panel</span>
+            <span className="font-bold text-lg">{t('common.appName')}</span>
             <Button variant="ghost" size="icon" onClick={onToggle} className="text-white hover:bg-gray-700">
               <X size={18} />
             </Button>
@@ -160,7 +153,7 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }: SidebarProps) {
       isOpen ? "w-72" : "w-20"
     )}>
       <div className={cn("p-4 border-b border-gray-800 flex items-center", isOpen ? "justify-between" : "justify-center")}>
-        {isOpen && <span className="font-bold text-lg ml-2">Admin Panel</span>}
+        {isOpen && <span className="font-bold text-lg ml-2">{t('common.appName')}</span>}
         <Button variant="ghost" size="icon" onClick={onToggle} className="text-white hover:bg-gray-700">
           {isOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
         </Button>
@@ -173,5 +166,5 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }: SidebarProps) {
 }
 `;
   fs.writeFileSync(path.join(dir, "Sidebar.tsx"), content, "utf8");
-  console.log("✅ Generated responsive Sidebar component with smart links.");
+  console.log("✅ Generated responsive Sidebar component with smart, translatable links.");
 }
