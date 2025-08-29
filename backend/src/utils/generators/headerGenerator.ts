@@ -5,7 +5,7 @@ import path from "path";
 const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
 
 export function generateHeader(): void {
-  const dir = path.join(getBaseDir(), "src", "components", "layout");
+  const dir = path.join(getBaseDir(), "src", "layout");
   const content = `
 import { useLocation, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";

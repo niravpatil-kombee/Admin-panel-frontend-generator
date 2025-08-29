@@ -30,7 +30,7 @@ export function setupFrontendProject(): void {
   // Step 2: Install general dependencies
   console.log("📦 Installing app dependencies...");
   execSync(
-    `npm install axios react-router-dom lucide-react class-variance-authority tailwind-variants react-hook-form zod @hookform/resolvers clsx tailwind-merge @tanstack/react-table date-fns react-dropzone @reduxjs/toolkit react-redux react-i18next i18next-browser-languagedetector`,
+    `npm install axios react-router-dom lucide-react class-variance-authority tailwind-variants react-hook-form zod @hookform/resolvers clsx tailwind-merge @tanstack/react-table date-fns react-dropzone @reduxjs/toolkit react-redux  react-i18next i18next-browser-languagedetector`,
     frontendExecOptions
   );
 
@@ -177,7 +177,7 @@ export function cn(...inputs: ClassValue[]) {
   }
 
   // Step 7
-  ["src/pages", "src/services"].forEach((d) => {
+  ["src/pages"].forEach((d) => {
     const full = path.join(baseDir, d);
     if (!fs.existsSync(full)) fs.mkdirSync(full, { recursive: true });
   });

@@ -51,11 +51,14 @@ export function generateListPage(
         .map((f) => {
           const sName = sanitizeFieldName(f.fieldName);
           if (sName === "id") return ``;
-          return `${sName}: ${
-            mapToTsType(f.zodType) === "number"
-              ? 10 + i
-              : `"${capitalize(f.fieldName.replace(/_/g, " "))} ${i + 1}"`
-          }`;
+          const tsType = mapToTsType(f.zodType);
+          if (tsType === "number") {
+            return `${sName}: ${10 + i}`;
+          }
+          if (tsType === "boolean") {
+            return `${sName}: ${i % 2 === 0 ? "true" : "false"}`;
+          }
+          return `${sName}: "${capitalize(f.fieldName.replace(/_/g, " "))} ${i + 1}"`;
         })
         .join(", ")} }`
   ).join(",\n  ")}\n];`;
@@ -66,17 +69,20 @@ export function generateListPage(
 
   const componentContent = `
 import * as React from "react"
-import { Link, useSearchParams } from "react-router-dom"
+import { Link${isPopup ? ", useSearchParams" : ""} } from "react-router-dom"
 import { useTranslation } from "react-i18next";
 import { flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table"
 import { ArrowUpDown, Plus, Eye, Pencil, Trash2, Upload, Download } from "lucide-react"
-import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-${isPopup ? `import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"` : ""}
+${
+  isPopup
+    ? `import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"`
+    : ""
+}
 ${formImport}
 
 ${modelTypeDefinition}
@@ -132,12 +138,17 @@ export function ${componentName}() {
     { id: "select", header: ({ table }) => <Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={v => table.toggleAllPageRowsSelected(!!v)} />, cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={v => row.toggleSelected(!!v)} />, enableSorting: false },
     ${fieldsForListing
       .map((field) => {
-        const displayKey = field.fieldName.endsWith("_id") ? field.fieldName.replace(/_id$/, "") : field.fieldName;
+        const displayKey = field.fieldName.endsWith("_id")
+          ? field.fieldName.replace(/_id$/, "")
+          : field.fieldName;
         return `{ 
       accessorKey: "${sanitizeFieldName(field.fieldName)}", 
-      header: ({ column }) => (${field.sortable
-        ? `<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>{t("${singleModel}.fields.${displayKey}")}<ArrowUpDown className="ml-2 h-4 w-4" /></Button>`
-        : `<span>{t("models.${singleModel}.fields.${displayKey}")}</span>`})
+      header: ({ column }) => (${
+        field.sortable
+          ? `<Button variant=\"ghost\" onClick={() => column.toggleSorting(column.getIsSorted() === \"asc\")}>{t(\"${singleModel}.fields.${displayKey}\")}<ArrowUpDown className=\"ml-2 h-4 w-4\" /></Button>`
+          : `<span>{t(\"${singleModel}.fields.${displayKey}\")}</span>`
+      }),
+      ${field.sortable ? `cell: ({ getValue }) => (<div className=\"pl-5\">{String(getValue() ?? '')}</div>)` : ``}
     }`;
       })
       .join(",\n    ")},
@@ -192,7 +203,9 @@ export function ${componentName}() {
           <div className="border-y"><div className="grid auto-rows-min gap-y-4 p-6">
             ${fieldsForDialog
               .map((field) => {
-                const displayKey = field.fieldName.endsWith("_id") ? field.fieldName.replace(/_id$/, "") : field.fieldName;
+                const displayKey = field.fieldName.endsWith("_id")
+                  ? field.fieldName.replace(/_id$/, "")
+                  : field.fieldName;
                 return `<div className="grid grid-cols-2 items-start gap-x-4"><span className="text-muted-foreground">{t("${singleModel}.fields.${displayKey}")}</span><p className="font-medium">{String(viewingRow?.${sanitizeFieldName(
                   field.fieldName
                 )} ?? '')}</p></div>`;

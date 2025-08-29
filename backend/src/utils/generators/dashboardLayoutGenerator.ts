@@ -5,7 +5,7 @@ import path from "path";
 const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
 
 export function generateDashboardLayout(): void {
-  const dir = path.join(getBaseDir(), "src", "components", "layout");
+  const dir = path.join(getBaseDir(), "src", "layout");
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
   const content = `

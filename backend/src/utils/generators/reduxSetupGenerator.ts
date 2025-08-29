@@ -1,102 +1,98 @@
-// src/utils/generators/apiSetupGenerator.ts
-
 import fs from "fs";
 import path from "path";
 
-const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
+const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend"); // Adjust if your frontend is in a different relative path
 
 export function generateApiSetup(): void {
-  const libDir = path.join(getBaseDir(), "src", "lib");
-  if (!fs.existsSync(libDir)) {
-    fs.mkdirSync(libDir, { recursive: true });
-  }
+  const storeDir = path.join(getBaseDir(), "src", "store");
+  const apiServicePath = path.join(getBaseDir(), "src", "api", "apiService.ts");
+  const rootReducerPath = path.join(storeDir, "rootReducer.ts");
+  const storePath = path.join(storeDir, "index.ts");
+  const apiDir = path.join(getBaseDir(), "src", "api");
 
-  const apiFilePath = path.join(libDir, "api.ts");
-  const envExampleFilePath = path.join(getBaseDir(), ".env.example"); 
+  // Ensure directories exist
+  [storeDir, apiDir].forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  });
 
-  const apiContent = `
-import axios from 'axios';
+  // Generate apiService.ts
+  const apiServiceContent = `import axios from 'axios';
 
-// 1. Create a new Axios instance with a custom configuration
-const api = axios.create({
-  // --- IMPORTANT ---
-  // The base URL should be set in your .env file
-  // VITE_API_BASE_URL=http://localhost:5000/api
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'; // Adjust as needed
+
+const apiService = axios.create({
+  baseURL: API_BASE_URL,
   headers: {
-    'Accept': 'application/json',
+    'Content-Type': 'application/json',
   },
 });
 
-// 2. Add a request interceptor to include the auth token
-api.interceptors.request.use(
+apiService.interceptors.request.use(
   (config) => {
-    // Get the token from localStorage (or your state management)
-    const token = localStorage.getItem('authToken'); 
-    
+    const token = localStorage.getItem('authToken'); // Or wherever you store your token
     if (token) {
-      // If the token exists, add it to the Authorization header
-      config.headers['Authorization'] = \`Bearer \${token}\`;
+      config.headers.Authorization = \`Bearer \${token}\`;
     }
-    
     return config;
   },
   (error) => {
-    // Handle request errors
     return Promise.reject(error);
   }
 );
 
-// 3. Add a response interceptor for global error handling
-api.interceptors.response.use(
-  (response) => {
-    // Any status code within the range of 2xx causes this function to trigger
-    return response;
-  },
+apiService.interceptors.response.use(
+  (response) => response,
   (error) => {
-    // Any status codes that falls outside the range of 2xx causes this function to trigger
-    
-    // Example: Handle 401 Unauthorized errors (e.g., token expired)
     if (error.response && error.response.status === 401) {
-      // localStorage.removeItem('authToken');
-      // window.location.href = '/login'; // Redirect to login page
-      console.error("Unauthorized! Redirecting to login.");
+      // Handle unauthorized errors, e.g., redirect to login
+      console.error('Unauthorized, redirecting to login...');
+      // window.location.href = '/login'; // Example redirection
     }
-
-    // Return a structured error object for consistent handling in your components
-    return Promise.reject(error.response ? error.response.data : error);
+    return Promise.reject(error);
   }
 );
 
-// 4. Define wrapper functions for common methods
-const get = <T>(url: string, params?: object) => api.get<T>(url, { params });
-const post = <T>(url: string, data: object) => api.post<T>(url, data);
-const put = <T>(url: string, data: object) => api.put<T>(url, data);
-const patch = <T>(url: string, data: object) => api.patch<T>(url, data);
-// Use 'del' as 'delete' is a reserved keyword
-const del = <T>(url: string) => api.delete<T>(url);
-
-export const apiService = {
-  get,
-  post,
-  put,
-  patch,
-  del,
-};
-
-export default api;
+export default apiService;
 `;
+  fs.writeFileSync(apiServicePath, apiServiceContent, "utf8");
+  console.log(`✅ Generated API service at: ${apiServicePath}`);
 
-  const envExampleContent = `
-# This is an example environment file.
-# Copy this file to .env.local and fill in your actual API URL.
+  // Generate rootReducer.ts
+  const rootReducerContent = `import { combineReducers } from '@reduxjs/toolkit';
+// import appReducer from './appSlice'; // Will be generated or dynamically imported
 
-VITE_API_BASE_URL=http://localhost:5000/api
+const rootReducer = combineReducers({
+  // app: appReducer, // Add your slices here
+});
+
+export type RootState = ReturnType<typeof rootReducer>;
+export default rootReducer;
 `;
+  fs.writeFileSync(rootReducerPath, rootReducerContent, "utf8");
+  console.log(`✅ Generated rootReducer at: ${rootReducerPath}`);
 
-  fs.writeFileSync(apiFilePath, apiContent, "utf8");
-  console.log(`✅ Generated Axios setup at: ${apiFilePath}`);
+  // Generate Redux store index.ts
+  const storeContent = `import { configureStore } from '@reduxjs/toolkit';
+import rootReducer from './rootReducer';
 
-  fs.writeFileSync(envExampleFilePath, envExampleContent, "utf8");
-  console.log(`✅ Generated .env.example file in the project root.`);
+const store = configureStore({
+  reducer: rootReducer,
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware({
+      // You might want to disable serializableCheck for FormData if you're using it directly in actions/state
+      serializableCheck: {
+        ignoredActions: [], // Add action types that carry non-serializable data
+        ignoredPaths: [], // Add paths to your state that might contain non-serializable data
+      },
+    }),
+  devTools: process.env.NODE_ENV !== 'production',
+});
+
+export type AppDispatch = typeof store.dispatch;
+export default store;
+`;
+  fs.writeFileSync(storePath, storeContent, "utf8");
+  console.log(`✅ Generated Redux store at: ${storePath}`);
 }

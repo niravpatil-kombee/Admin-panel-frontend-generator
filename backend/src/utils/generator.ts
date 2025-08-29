@@ -18,8 +18,8 @@ import { generateListPage } from "./generators/listPageGenerator";
 import { generateDashboard } from "./generators/dashboardGenerator";
 import { generateIndexCss } from "./generators/indexCssGenerator";
 import { generateLogin } from "./generators/loginGenerator";
-import { generateReduxThunks } from "./generators/reduxThunkGenerator"; 
 import { generateApiSetup } from "./generators/reduxSetupGenerator";
+import { generateReduxThunks } from "./generators/reduxThunkGenerator";
 import { generateI18n } from "./generators/i18Generator";
 import { generateLanguageSwitcher } from "./generators/languageSwitcherGenerator";
 
@@ -40,9 +40,7 @@ router.post("/generate", upload.single("file"), async (req, res) => {
     console.log("\n🚀 Admin Panel Generation Process Started 🚀");
     setupFrontendProject();
 
-    console.log("Generating Axios API setup...");
-    generateApiSetup();
-    generateReduxThunks();
+   
 
     const models = parseExcel(req.file.path);
     const modelNames = Object.keys(models);
@@ -55,7 +53,10 @@ router.post("/generate", upload.single("file"), async (req, res) => {
     generateThemeProvider();
     generateThemeToggle();
 
-
+    console.log("Generating Axios API setup...");
+    generateApiSetup();
+    generateReduxThunks(modelNames, models);
+    
     console.log("Generating i18n setup...");
     generateI18n(modelNames); 
     generateLanguageSwitcher()

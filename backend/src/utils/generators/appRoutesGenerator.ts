@@ -56,8 +56,8 @@ export function generateAppRoutes(models: Record<string, ModelConfig>): void {
   const content = `
 import './App.css';
 import { Routes, Route } from 'react-router-dom';
-import DashboardLayout from './components/layout/DashboardLayout';
-import Dashboard from './components/Dashboard'; 
+import DashboardLayout from './layout/DashboardLayout';
+import Dashboard from './layout/Dashboard'; 
 import { LoginPage } from './pages/Auth/LoginPage';
 ${imports}
 

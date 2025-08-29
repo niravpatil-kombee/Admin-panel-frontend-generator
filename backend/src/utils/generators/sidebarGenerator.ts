@@ -6,7 +6,7 @@ const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function generateSidebar(models: Record<string, ModelConfig>): void {
-  const dir = path.join(getBaseDir(), "src", "components", "layout");
+  const dir = path.join(getBaseDir(), "src", "layout");
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
   const modelEntries = Object.entries(models).map(([name, config]) => {

@@ -235,7 +235,7 @@ function generateFormField(field: Field, modelName: string): string {
           )}
         </div>
       </FormControl>
-      <FormMessage />
+      <FormMessage className="text-red-400 font-normal text-sm" />
     </FormItem>
   )}
 />`;
@@ -264,7 +264,7 @@ function generateFormField(field: Field, modelName: string): string {
               <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
             </PopoverContent>
           </Popover>
-          <FormMessage />
+        <FormMessage className="text-red-400 font-normal text-sm" />
         </FormItem>
       )} />`;
 
@@ -276,7 +276,22 @@ function generateFormField(field: Field, modelName: string): string {
       else if (field.zodType === "number" && !isIdField) inputType = "number";
       // ID fields will use text input instead of number input
 
-      control = `<Input type="${inputType}" className="bg-background" placeholder={t("${singleModel}.placeholders.${displayKey}")} style={{ height: '2.75rem' }} {...field} />`;
+      if (field.fieldName.toLowerCase().includes("password")) {
+        control = `<div className="relative">
+          <Input type={showPassword ? "text" : "password"} className="bg-background pr-10" placeholder={t("${singleModel}.placeholders.${displayKey}")} style={{ height: '2.75rem' }} {...field} />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute right-0 top-0 h-full px-3 hover:bg-transparent"
+            onClick={() => setShowPassword(!showPassword)}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        </div>`;
+      } else {
+        control = `<Input type="${inputType}" className="bg-background" placeholder={t("${singleModel}.placeholders.${displayKey}")} style={{ height: '2.75rem' }} {...field} />`;
+      }
   }
 
   return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
@@ -285,7 +300,7 @@ function generateFormField(field: Field, modelName: string): string {
       <FormControl>
         ${control}
       </FormControl>
-      <FormMessage />
+     <FormMessage className="text-red-400 font-normal text-sm" />
     </FormItem>
   )} />`;
 }

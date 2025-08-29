@@ -4,7 +4,7 @@ import path from "path";
 const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
 
 export function generateLanguageSwitcher(): void {
-  const componentsDir = path.join(getBaseDir(), "src", "components", "layout");
+  const componentsDir = path.join(getBaseDir(), "src", "layout");
   if (!fs.existsSync(componentsDir)) fs.mkdirSync(componentsDir, { recursive: true });
 
   const switcherPath = path.join(componentsDir, "LanguageSwitcher.tsx");
@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 const languages = [
   { code: 'en', name: 'English' },
   { code: 'fr', name: 'Français' },
+  { code: 'ar', name: 'Arabic' },
 ];
 
 export function LanguageSwitcher() {
