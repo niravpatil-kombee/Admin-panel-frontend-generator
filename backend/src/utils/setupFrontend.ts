@@ -177,7 +177,7 @@ export function cn(...inputs: ClassValue[]) {
   }
 
   // Step 7
-  ["src/pages"].forEach((d) => {
+  ["src/pages", "src/routes"].forEach((d) => {
     const full = path.join(baseDir, d);
     if (!fs.existsSync(full)) fs.mkdirSync(full, { recursive: true });
   });

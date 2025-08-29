@@ -13,7 +13,7 @@ import { generateFormComponent } from "./generators/formGenerator";
 import { generateDashboardLayout } from "./generators/dashboardLayoutGenerator";
 import { generateHeader } from "./generators/headerGenerator";
 import { generateSidebar } from "./generators/sidebarGenerator";
-import { generateAppRoutes } from "./generators/appRoutesGenerator";
+import { generateAppRoutes } from "./generators/routesGenerator";
 import { generateListPage } from "./generators/listPageGenerator";
 import { generateDashboard } from "./generators/dashboardGenerator";
 import { generateIndexCss } from "./generators/indexCssGenerator";
@@ -28,7 +28,7 @@ import {
   generateThemeProvider,
   generateThemeToggle,
 } from "./generators/themeGenerator";
-import { generateMainTsx } from "./generators/mainTsxGenerator";
+import { generateAppTsx } from "./generators/appTsxGenerator";
 
 const router = express.Router();
 const upload = multer({ dest: "uploads/" });
@@ -81,7 +81,7 @@ router.post("/generate", upload.single("file"), async (req, res) => {
     console.log("Generating routes and application root...");
     generateAppRoutes(models);
     generateIndexCss();
-    generateMainTsx(); // Generate the main entry point
+    generateAppTsx(); // Generate the main entry point
 
     console.log(
       "\n✅ Generation Complete! Frontend is ready with theme toggling."
