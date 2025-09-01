@@ -305,16 +305,14 @@ function generateFormField(field: Field, modelName: string): string {
   )} />`;
 }
 
-// --- UPDATED FUNCTION ---
-function generateOnSubmitFunction(modelName: string, fileFields: Field[], isPopup: boolean): string {
+function generateOnSubmitFunction(modelName: string, fileFields: Field[]): string {
   const typeName = `${capitalize(modelName)}FormValues`;
   
   // Logic for forms WITHOUT file uploads (e.g., Role, Brand)
   if (fileFields.length === 0) {
-    const body = isPopup 
-      ? `    onSubmit(values);`
-      : `    console.log("Form Submitted (JSON):", values);\n    // TODO: Implement your submission logic here.`;
-    return `  function ${isPopup ? 'handleFormSubmit' : 'onSubmit'}(values: ${typeName}) {\n${body}\n  }`;
+    return `  function handleFormSubmit(values: ${typeName}) {
+    onSubmit(values);
+  }`;
   }
 
   // Logic for forms WITH file uploads (e.g., User)
@@ -325,16 +323,7 @@ function generateOnSubmitFunction(modelName: string, fileFields: Field[], isPopu
       formData.append("${field.fieldName}", values.${field.fieldName});
     }`).join('');
 
-  // --- THIS IS THE FIX ---
-  // Update the 'body' for non-popup forms to provide a clear log.
-  const body = isPopup 
-    ? `    onSubmit(formData);`
-    : `    console.log("Form Submitted (FormData):");
-    for (const [key, value] of formData.entries()) {
-      console.log(key, value);
-    }`;
-
-  return `  function ${isPopup ? 'handleFormSubmit' : 'onSubmit'}(values: ${typeName}) {
+  return `  function handleFormSubmit(values: ${typeName}) {
     const formData = new FormData();
     for (const key in values) {
       const value = values[key as keyof typeof values];
@@ -346,15 +335,17 @@ function generateOnSubmitFunction(modelName: string, fileFields: Field[], isPopu
       }
     }${formDataLogic}
 
-    ${body}
+    onSubmit(formData);
   }`;
 }
 
 // --- MAIN GENERATOR FUNCTION ---
 
 export function generateFormComponent(modelName: string, modelConfig: ModelConfig): void {
+  const modelDirName = capitalize(modelName);
   const componentName = `${capitalize(modelName)}Form`;
-  const outputDir = modelConfig.isPopup ? path.join(getBaseDir(), "src", "components", "forms") : path.join(getBaseDir(), "src", "pages", capitalize(modelName));
+  const outputDir = path.join(getBaseDir(), "src", "components", "forms", modelDirName);
+
 
   const hasDatePicker = modelConfig.fields.some((f) => f.uiType === "datepicker");
   const hasFileUpload = modelConfig.fields.some((f) => f.uiType === "file");
@@ -363,63 +354,61 @@ export function generateFormComponent(modelName: string, modelConfig: ModelConfi
   const zodSchemaFields = modelConfig.fields.map((f) => `    ${f.fieldName}: ${generateZodValidation(f, modelName)}`).join(",\n");
   const defaultValues = modelConfig.fields.map((f) => `      ${f.fieldName}: ${generateDefaultValue(f)}`).join(",\n");
 
-  const componentContent = modelConfig.isPopup
-    ? generatePopupFormComponent(modelName, componentName, zodSchemaFields, defaultValues, modelConfig.fields, hasDatePicker, hasFileUpload, hasPassword)
-    : generateRegularFormComponent(modelName, componentName, zodSchemaFields, defaultValues, modelConfig.fields, hasDatePicker, hasFileUpload, hasPassword);
+  const componentContent = generateDrawerFormComponent(modelName, componentName, zodSchemaFields, defaultValues, modelConfig.fields, hasDatePicker, hasFileUpload, hasPassword);
 
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(path.join(outputDir, `${componentName}.tsx`), componentContent, "utf8");
-  console.log(`✅ Generated ${modelConfig.isPopup ? "Popup Form" : "Page Form"} for ${modelName} at: ${path.join(outputDir, `${componentName}.tsx`)}`);
+  console.log(`✅ Generated Drawer Form for ${modelName} at: ${path.join(outputDir, `${componentName}.tsx`)}`);
 }
 
-// --- TEMPLATE GENERATORS ---
+// --- DRAWER FORM COMPONENT GENERATOR ---
 
-function generatePopupFormComponent(modelName: string, componentName: string, zodSchema: string, defaultValues: string, fields: Field[], hasDatePicker: boolean, hasFileUpload: boolean, hasPassword: boolean): string {
-    const typeName = `${capitalize(modelName)}FormValues`;
-    const singleModel = modelName.toLowerCase();
-    const fileFields = fields.filter(f => f.uiType === 'file');
-  
-    const mainFormFields = fields.map(field => {
-      const fieldJsx = generateFormField(field, modelName);
-      if (field.isRemoveInEditForm) {
-        return `          {!initialData?.id && (\n            <>${fieldJsx}</>\n          )}`;
-      }
-      return `          ${fieldJsx}`;
-    }).join("\n\n");
-  
-    const lucideIcons = [];
-    if (hasFileUpload) lucideIcons.push('CloudUpload');
-    if (hasDatePicker) lucideIcons.push('CalendarIcon');
-    if (hasPassword) {
-        lucideIcons.push('Eye');
-        lucideIcons.push('EyeOff');
+function generateDrawerFormComponent(modelName: string, componentName: string, zodSchema: string, defaultValues: string, fields: Field[], hasDatePicker: boolean, hasFileUpload: boolean, hasPassword: boolean): string {
+  const typeName = `${capitalize(modelName)}FormValues`;
+  const singleModel = modelName.toLowerCase();
+  const fileFields = fields.filter(f => f.uiType === 'file');
+
+  const mainFormFields = fields.map(field => {
+    const fieldJsx = generateFormField(field, modelName);
+    if (field.isRemoveInEditForm) {
+      return `          {!initialData?.id && (\n            <>${fieldJsx}</>\n          )}`;
     }
+    return `          ${fieldJsx}`;
+  }).join("\n\n");
 
-    const imports = [
-      `import { useForm } from "react-hook-form";`,
-      `import { zodResolver } from "@hookform/resolvers/zod";`,
-      `import * as z from "zod";`,
-      `import { useTranslation } from "react-i18next";`,
-      (hasFileUpload || hasPassword) && `import { useState } from "react";`,
-      hasFileUpload && `import { useDropzone } from "react-dropzone";`,
-      hasDatePicker && `import { format } from "date-fns";`,
-      lucideIcons.length > 0 && `import { ${lucideIcons.join(', ')} } from "lucide-react";`,
-      hasDatePicker && `import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";`,
-      hasDatePicker && `import { Calendar } from "@/components/ui/calendar";`,
-      `import { cn } from "@/lib/utils";`,
-      `import { Button } from "@/components/ui/button";`,
-      `import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";`,
-      `import { Input } from "@/components/ui/input";`,
-      `import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";`,
-      `import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";`,
-      `import { Checkbox } from "@/components/ui/checkbox";`,
-      `import { Switch } from "@/components/ui/switch";`,
-      `import { Textarea } from "@/components/ui/textarea";`,
-    ].filter(Boolean).join('\n');
-  
-    const stateHooks = fileFields.map(f => `  const [${f.fieldName}File, set${capitalize(f.fieldName)}File] = useState<File | null>(null);`).join('\n');
-    const passwordStateHook = hasPassword ? `  const [showPassword, setShowPassword] = useState(false);` : "";
-    const dropzoneHooks = fileFields.map(f => `
+  const lucideIcons = [];
+  if (hasFileUpload) lucideIcons.push('CloudUpload');
+  if (hasDatePicker) lucideIcons.push('CalendarIcon');
+  if (hasPassword) {
+      lucideIcons.push('Eye');
+      lucideIcons.push('EyeOff');
+  }
+
+  const imports = [
+    `import { useForm } from "react-hook-form";`,
+    `import { zodResolver } from "@hookform/resolvers/zod";`,
+    `import * as z from "zod";`,
+    `import { useTranslation } from "react-i18next";`,
+    (hasFileUpload || hasPassword) && `import { useState } from "react";`,
+    hasFileUpload && `import { useDropzone } from "react-dropzone";`,
+    hasDatePicker && `import { format } from "date-fns";`,
+    lucideIcons.length > 0 && `import { ${lucideIcons.join(', ')} } from "lucide-react";`,
+    hasDatePicker && `import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";`,
+    hasDatePicker && `import { Calendar } from "@/components/ui/calendar";`,
+    `import { cn } from "@/lib/utils";`,
+    `import { Button } from "@/components/ui/button";`,
+    `import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";`,
+    `import { Input } from "@/components/ui/input";`,
+    `import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";`,
+    `import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";`,
+    `import { Checkbox } from "@/components/ui/checkbox";`,
+    `import { Switch } from "@/components/ui/switch";`,
+    `import { Textarea } from "@/components/ui/textarea";`,
+  ].filter(Boolean).join('\n');
+
+  const stateHooks = fileFields.map(f => `  const [${f.fieldName}File, set${capitalize(f.fieldName)}File] = useState<File | null>(null);`).join('\n');
+  const passwordStateHook = hasPassword ? `  const [showPassword, setShowPassword] = useState(false);` : "";
+  const dropzoneHooks = fileFields.map(f => `
   const { getRootProps: getRootPropsFor${capitalize(f.fieldName)}, getInputProps: getInputPropsFor${capitalize(f.fieldName)}, isDragActive: is${capitalize(f.fieldName)}DragActive } = useDropzone({
     accept: { "image/*": [] },
     multiple: false,
@@ -431,8 +420,8 @@ function generatePopupFormComponent(modelName: string, componentName: string, zo
       }
     },
   });`).join('\n');
-  
-    return `${imports}
+
+  return `${imports}
 
 // Schema with translated error messages
 const ${capitalize(modelName)}Schema = (t: any) =>
@@ -463,7 +452,7 @@ ${defaultValues},
   });
 ${dropzoneHooks}
 
-  ${generateOnSubmitFunction(modelName, fileFields, true)}
+  ${generateOnSubmitFunction(modelName, fileFields)}
 
   return (
     <Form {...form}>
@@ -480,112 +469,3 @@ ${mainFormFields}
   );
 }`;
   }
-  
-  function generateRegularFormComponent(modelName: string, componentName: string, zodSchema: string, defaultValues: string, fields: Field[], hasDatePicker: boolean, hasFileUpload: boolean, hasPassword: boolean): string {
-    const typeName = `${capitalize(modelName)}FormValues`;
-    const singleModel = modelName.toLowerCase();
-    const fileFields = fields.filter(f => f.uiType === 'file');
-  
-    const mainFormFields = fields.map(field => {
-      const fieldJsx = generateFormField(field, modelName);
-      if (field.isRemoveInEditForm) {
-        return `            {!id && (\n              <>${fieldJsx}</>\n            )}`;
-      }
-      return `            ${fieldJsx}`;
-    }).join("\n\n");
-  
-    const lucideIcons = [];
-    if (hasFileUpload) lucideIcons.push('CloudUpload');
-    if (hasDatePicker) lucideIcons.push('CalendarIcon');
-    if (hasPassword) {
-        lucideIcons.push('Eye');
-        lucideIcons.push('EyeOff');
-    }
-
-    const imports = [
-      `import { useForm } from "react-hook-form";`,
-      `import { zodResolver } from "@hookform/resolvers/zod";`,
-      `import * as z from "zod";`,
-      `import { useParams } from "react-router-dom";`,
-      `import { useTranslation } from "react-i18next";`,
-      (hasFileUpload || hasPassword) && `import { useState } from "react";`,
-      hasFileUpload && `import { useDropzone } from "react-dropzone";`,
-      hasDatePicker && `import { format } from "date-fns";`,
-      lucideIcons.length > 0 && `import { ${lucideIcons.join(', ')} } from "lucide-react";`,
-      hasDatePicker && `import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";`,
-      hasDatePicker && `import { Calendar } from "@/components/ui/calendar";`,
-      `import { cn } from "@/lib/utils";`,
-      `import { Button } from "@/components/ui/button";`,
-      `import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";`,
-      `import { Input } from "@/components/ui/input";`,
-      `import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";`,
-      `import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";`,
-      `import { Checkbox } from "@/components/ui/checkbox";`,
-      `import { Switch } from "@/components/ui/switch";`,
-      `import { Textarea } from "@/components/ui/textarea";`,
-    ].filter(Boolean).join('\n');
-    
-    const stateHooks = fileFields.map(f => `  const [${f.fieldName}File, set${capitalize(f.fieldName)}File] = useState<File | null>(null);`).join('\n');
-    const passwordStateHook = hasPassword ? `  const [showPassword, setShowPassword] = useState(false);` : "";
-    const dropzoneHooks = fileFields.map(f => `
-  const { getRootProps: getRootPropsFor${capitalize(f.fieldName)}, getInputProps: getInputPropsFor${capitalize(f.fieldName)}, isDragActive: is${capitalize(f.fieldName)}DragActive } =
-    useDropzone({
-      accept: { "image/*": [] },
-      multiple: false,
-      onDrop: (acceptedFiles) => {
-        const file = acceptedFiles[0];
-        if (file) {
-          set${capitalize(f.fieldName)}File(file);
-          form.setValue("${f.fieldName}", file as any);
-        }
-      }
-    });`).join('\n');
-  
-    return `${imports}
-
-// Schema with translated error messages
-const ${capitalize(modelName)}Schema = (t: any) =>
-  z.object({
-${zodSchema}
-  });
-
-type ${typeName} = z.infer<ReturnType<typeof ${capitalize(modelName)}Schema>>;
-
-export function ${componentName}() {
-  const { id } = useParams<{ id: string }>();
-  const { t } = useTranslation();
-${stateHooks}
-${passwordStateHook}
-
-  const form = useForm<${typeName}>({
-    resolver: zodResolver(${capitalize(modelName)}Schema(t)),
-    defaultValues: {
-${defaultValues}
-    }
-  });
-${dropzoneHooks}
-
-  ${generateOnSubmitFunction(modelName, fileFields, false)}
-
-  return (
-    <div className="w-full bg-card border rounded-xl shadow-sm">
-      <div className="p-6 md-p-8 border-b">
-        <h1 className="text-2xl font-bold text-foreground">
-          {id ? t("form.editTitle", { model: t("models.${singleModel}") }) : t("form.createTitle", { model: t("models.${singleModel}") })}
-        </h1>
-      </div>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="p-6 md:p-8 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-8">
-${mainFormFields}
-          </div>
-
-          <div className="flex justify-end pt-4">
-            <Button type="submit" size="lg">{t("common.save")}</Button>
-          </div>
-        </form>
-      </Form>
-    </div>
-  );
-}`
-    }

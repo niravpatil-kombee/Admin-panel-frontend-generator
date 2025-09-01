@@ -9,9 +9,10 @@ export function generateSidebar(models: Record<string, ModelConfig>): void {
   const dir = path.join(getBaseDir(), "src", "layout");
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  const modelEntries = Object.entries(models).map(([name, config]) => {
+  const modelEntries = Object.keys(models).map((name) => {
     const lower = name.toLowerCase();
-    const createHref = config.isPopup ? `/${lower}s?action=create` : `/${lower}/create`;
+    // All create actions now use URL parameters to trigger drawer opening
+    const createHref = `/${lower}s?action=create`;
     return `{
       label: t('models.${lower}_plural'),
       modelKey: '${lower}',
@@ -40,7 +41,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 const iconMap: { [key: string]: React.ElementType } = { Home, Users, Settings };
 
-// UPDATED: The active link check now ignores URL parameters like '?action=create'
+// Active link check ignores URL parameters like '?action=create'
 const isLinkActive = (item: any, pathname: string): boolean => {
   if (item.href && item.href.split('?')[0] === pathname) return true;
   return item.children?.some((child: any) => isLinkActive(child, pathname)) ?? false;
@@ -166,5 +167,5 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }: SidebarProps) {
 }
 `;
   fs.writeFileSync(path.join(dir, "Sidebar.tsx"), content, "utf8");
-  console.log("✅ Generated responsive Sidebar component with smart, translatable links.");
+  console.log("✅ Generated responsive Sidebar component with drawer-based create links.");
 }

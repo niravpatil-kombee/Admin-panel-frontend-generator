@@ -58,21 +58,23 @@ const loadGeneratedRoutes = () => {
 // Use the dedicated router for the '/generate' endpoint
 app.use(generatorRoutes);
 
+
+app.listen(PORT, () => {
+  console.log(`⚙️  Server is running at http://localhost:${PORT}`);
+  console.log("🚀 Send a POST request with an Excel file to /generate to begin.");
+});
 // ==========================================================
 // SERVER STARTUP
 // ==========================================================
-mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/admin-panel-generator")
-  .then(() => {
-    console.log("✅ MongoDB Connected successfully");
+// mongoose.connect(process.env.MONGODB_URI || "mongodb://localhost:27017/admin-panel-generator")
+//   .then(() => {
+//     console.log("✅ MongoDB Connected successfully");
 
-    // Load any existing routes before the server starts
-    loadGeneratedRoutes();
+//     // Load any existing routes before the server starts
+//     loadGeneratedRoutes();
 
-    app.listen(PORT, () => {
-      console.log(`⚙️  Server is running at http://localhost:${PORT}`);
-      console.log("🚀 Send a POST request with an Excel file to /generate to begin.");
-    });
-  })
-  .catch((err) => {
-    console.error("❌ MongoDB connection error. Please ensure MongoDB is running.", err);
-  });
+   
+//   })
+//   .catch((err) => {
+//     console.error("❌ MongoDB connection error. Please ensure MongoDB is running.", err);
+//   });

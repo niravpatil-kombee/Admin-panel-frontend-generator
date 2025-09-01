@@ -43,7 +43,6 @@ export interface Field {
 }
 export interface ModelConfig {
   fields: Field[];
-  isPopup: boolean;
   noCrud: boolean;
 }
 function createLabel(fieldName: string): string {
@@ -181,17 +180,16 @@ function parseValidationRules(
  * @returns An object containing the detected configuration flags.
  */
 function getTableConfig(worksheet: xlsx.WorkSheet): {
-  isPopup: boolean;
   noCrud: boolean;
 } {
   const range = xlsx.utils.decode_range(worksheet["!ref"] || "A1");
-  let isPopup = false;
   let noCrud = false;
 
   // Scan the first two rows (index 0 and 1) across all columns
   for (let r = 0; r <= 1; r++) {
     // Stop if we've already found both flags
-    if (isPopup && noCrud) break;
+    // if (isPopup && noCrud) break; // MODIFIED: only checking noCrud
+    if (noCrud) break;
 
     for (let c = range.s.c; c <= range.e.c; c++) {
       const cellAddress = xlsx.utils.encode_cell({ r, c });
@@ -200,9 +198,6 @@ function getTableConfig(worksheet: xlsx.WorkSheet): {
       if (cell && cell.v) {
         const cellValue = String(cell.v).trim().toLowerCase();
 
-        if (cellValue === "is_popup") {
-          isPopup = true;
-        }
         if (cellValue === "no_crud") {
           noCrud = true;
         }
@@ -210,7 +205,7 @@ function getTableConfig(worksheet: xlsx.WorkSheet): {
     }
   }
 
-  return { isPopup, noCrud };
+  return { noCrud };
 }
 
 // MAIN PARSING FUNCTION
@@ -231,22 +226,17 @@ export function parseExcel(filePath: string): Record<string, ModelConfig> {
     if (!tableName) continue;
 
     // Get table-level configuration by scanning the first two rows.
-    const { isPopup, noCrud } = getTableConfig(worksheet);
+    // const { isPopup, noCrud } = getTableConfig(worksheet); // MODIFIED
+    const { noCrud } = getTableConfig(worksheet);
 
     if (noCrud) {
       console.log(`⏩ Skipping ${tableName} (found 'no_crud' flag).`);
       continue;
     }
 
-    if (isPopup) {
-      console.log(
-        `✅ SUCCESS: Configuring ${tableName} to use POPUP forms (found 'is_popup' flag).`
-      );
-    } else {
-      console.log(
-        `- INFO: Configuring ${tableName} to use REGULAR page forms.`
-      );
-    }
+    console.log(
+      `✅ SUCCESS: Configuring ${tableName} to use DRAWER forms.`
+    );
 
     // Convert sheet to JSON, using the second row (range: 1) as the headers for the data.
     const rawRows = xlsx.utils.sheet_to_json<any>(worksheet, { range: 1 });
@@ -355,28 +345,8 @@ export function parseExcel(filePath: string): Record<string, ModelConfig> {
       .filter((f): f is Field => f !== null);
 
     if (fields.length > 0) {
-      models[tableName] = { fields, isPopup, noCrud };
+      models[tableName] = { fields, noCrud };
     }
   }
   return models;
-}
-
-// --- Helper functions remain the same ---
-export function getPopupModels(models: Record<string, ModelConfig>): string[] {
-  return Object.entries(models)
-    .filter(([_, config]) => config.isPopup)
-    .map(([modelName]) => modelName);
-}
-export function getRegularModels(
-  models: Record<string, ModelConfig>
-): string[] {
-  return Object.entries(models)
-    .filter(([_, config]) => !config.isPopup)
-    .map(([modelName]) => modelName);
-}
-export function isPopupModel(
-  models: Record<string, ModelConfig>,
-  modelName: string
-): boolean {
-  return models[modelName]?.isPopup || false;
 }

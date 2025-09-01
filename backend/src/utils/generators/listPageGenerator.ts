@@ -26,7 +26,7 @@ export function generateListPage(
   modelName: string,
   modelConfig: ModelConfig
 ): void {
-  const { fields, isPopup } = modelConfig;
+  const { fields } = modelConfig;
   const componentName = `${capitalize(modelName)}DataTable`;
   const formComponentName = `${capitalize(modelName)}Form`;
   const modelTypeName = capitalize(modelName);
@@ -63,27 +63,18 @@ export function generateListPage(
         .join(", ")} }`
   ).join(",\n  ")}\n];`;
 
-  const formImport = isPopup
-    ? `import { ${formComponentName} } from "@/components/forms/${formComponentName}";`
-    : `// Using full page form, no separate import needed if it's in the same directory structure.`;
-
   const componentContent = `
 import * as React from "react"
-import { Link${isPopup ? ", useSearchParams" : ""} } from "react-router-dom"
+import { Link, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next";
 import { flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table"
 import { ArrowUpDown, Plus, Eye, Pencil, Trash2, Upload, Download } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-${
-  isPopup
-    ? `import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"`
-    : ""
-}
-${formImport}
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
+import { ${formComponentName} } from "@/components/forms/${modelDirName}/${formComponentName}";
 
 ${modelTypeDefinition}
 ${mockData}
@@ -97,11 +88,9 @@ export function ${componentName}() {
   const [viewingRow, setViewingRow] = React.useState<${modelTypeName} | null>(null);
   const [isAlertOpen, setIsAlertOpen] = React.useState(false);
   const [itemToDelete, setItemToDelete] = React.useState<any>(null);
-  ${
-    isPopup
-      ? `
   const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
   const [editingRow, setEditingRow] = React.useState<${modelTypeName} | null>(null);
+  const [isViewDrawerOpen, setIsViewDrawerOpen] = React.useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   React.useEffect(() => {
@@ -121,14 +110,26 @@ export function ${componentName}() {
     setIsDrawerOpen(true);
   };
 
+  const handleView = (row: ${modelTypeName}) => {
+    setViewingRow(row);
+    setIsViewDrawerOpen(true);
+  };
+
+
+
   const handleFormSubmit = (values: any) => {
     console.log("Form submitted from drawer:", values);
-    // TODO: Add logic to either create or update the data
+    if (editingRow) {
+      // Update existing item
+      setData(d => d.map(item => item.id === editingRow.id ? { ...item, ...values } : item));
+    } else {
+      // Create new item
+      const newItem = { ...values, id: Math.max(...data.map(d => Number(d.id))) + 1 };
+      setData(d => [...d, newItem]);
+    }
     setIsDrawerOpen(false);
+    setEditingRow(null);
   };
-  `
-      : ""
-  }
 
   const handleDeleteRow = (id: any) => { setItemToDelete(id); setIsAlertOpen(true); };
   const handleDeleteSelected = () => { const ids = table.getFilteredSelectedRowModel().rows.map(r => r.original.id); setItemToDelete(ids); setIsAlertOpen(true); };
@@ -153,12 +154,8 @@ export function ${componentName}() {
       })
       .join(",\n    ")},
     { id: "actions", header: () => <div className="text-right">{t('common.actions')}</div>, cell: ({ row }) => (<div className="flex items-center justify-end gap-1">
-      <Button variant="ghost" size="icon" title={t('common.view')} onClick={() => setViewingRow(row.original)}><Eye className="h-4 w-4" /></Button>
-      ${
-        isPopup
-          ? `<Button variant="ghost" size="icon" title={t('common.edit')} onClick={() => handleEdit(row.original)}><Pencil className="h-4 w-4" /></Button>`
-          : `<Button asChild variant="ghost" size="icon" title={t('common.edit')}><Link to={\`/${singleModel}/edit/\${row.original.id}\`}><Pencil className="h-4 w-4" /></Link></Button>`
-      }
+      <Button variant="ghost" size="icon" title={t('common.view')} onClick={() => handleView(row.original)}><Eye className="h-4 w-4" /></Button>
+      <Button variant="ghost" size="icon" title={t('common.edit')} onClick={() => handleEdit(row.original)}><Pencil className="h-4 w-4" /></Button>
       <Button variant="ghost" size="icon" title={t('common.delete')} className="text-red-600" onClick={() => handleDeleteRow(row.original.id)}><Trash2 className="h-4 w-4" /></Button>
     </div>) },
   ], [t]);
@@ -178,11 +175,7 @@ export function ${componentName}() {
             <Button variant="outline" size="sm" onClick={() => alert('Export functionality to be implemented.')}>
               <Download className="h-4 w-4 mr-2" /> {t('common.export')}
             </Button>
-            ${
-              isPopup
-                ? `<Button size="sm" onClick={handleCreate}><Plus className="h-4 w-4 mr-2" /> {t('common.new')} {t('models.${singleModel}')}</Button>`
-                : `<Button asChild size="sm"><Link to="/${singleModel}/create"><Plus className="h-4 w-4 mr-2" /> {t('common.new')} {t('models.${singleModel}')}</Link></Button>`
-            }
+            <Button size="sm" onClick={handleCreate}><Plus className="h-4 w-4 mr-2" /> {t('common.new')} {t('models.${singleModel}')}</Button>
           </div>
         </div>
         <div className="rounded-md border">
@@ -197,32 +190,50 @@ export function ${componentName}() {
         </div>
       </div>
       
-      <Dialog open={!!viewingRow} onOpenChange={isOpen => !isOpen && setViewingRow(null)}>
-        <DialogContent className="sm:max-w-md p-0">
-          <DialogHeader className="p-6 pb-4"><DialogTitle>{t('form.viewTitle', { model: t('models.${singleModel}') })}</DialogTitle></DialogHeader>
-          <div className="border-y"><div className="grid auto-rows-min gap-y-4 p-6">
-            ${fieldsForDialog
-              .map((field) => {
-                const displayKey = field.fieldName.endsWith("_id")
-                  ? field.fieldName.replace(/_id$/, "")
-                  : field.fieldName;
-                return `<div className="grid grid-cols-2 items-start gap-x-4"><span className="text-muted-foreground">{t("${singleModel}.fields.${displayKey}")}</span><p className="font-medium">{String(viewingRow?.${sanitizeFieldName(
-                  field.fieldName
-                )} ?? '')}</p></div>`;
-              })
-              .join("")}
-          </div></div>
-          <DialogFooter className="sm:justify-end gap-2 p-6 pt-4"><Button variant="outline" onClick={() => setViewingRow(null)}>{t('common.cancel')}</Button><Button asChild><Link to={\`/${singleModel}/edit/\${viewingRow?.id}\`}><Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}</Link></Button></DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('common.areYouSure')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSureDescription')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setItemToDelete(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={confirmDelete}>{t('common.continue')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
 
-      ${
-        isPopup
-          ? `
+      {/* View Drawer */}
+      <Drawer open={isViewDrawerOpen} onOpenChange={setIsViewDrawerOpen} direction="right">
+        <DrawerContent className="w-[500px] ml-auto h-full">
+          <DrawerHeader>
+            <DrawerTitle>{t('form.viewTitle', { model: t('models.${singleModel}') })}</DrawerTitle>
+          </DrawerHeader>
+          <div className="p-6 overflow-y-auto">
+            <div className="grid auto-rows-min gap-y-6">
+              ${fieldsForDialog
+                .map((field) => {
+                  const displayKey = field.fieldName.endsWith("_id")
+                    ? field.fieldName.replace(/_id$/, "")
+                    : field.fieldName;
+                  return `<div className="grid grid-cols-3 items-start gap-x-4">
+                <span className="text-sm font-medium text-muted-foreground">{t("${singleModel}.fields.${displayKey}")}</span>
+                <div className="col-span-2">
+                  <p className="text-sm">{String(viewingRow?.${sanitizeFieldName(
+                    field.fieldName
+                  )} ?? '')}</p>
+                </div>
+              </div>`;
+                })
+                .join("")}
+            </div>
+            <div className="flex justify-end gap-2 pt-6 mt-6 border-t">
+              <Button variant="outline" onClick={() => setIsViewDrawerOpen(false)}>{t('common.close')}</Button>
+              <Button onClick={() => { 
+                if (viewingRow) {
+                  setIsViewDrawerOpen(false);
+                  handleEdit(viewingRow); 
+                }
+              }}>
+                <Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}
+              </Button>
+            </div>
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      {/* Form Drawer */}
       <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen} direction="right">
         <DrawerContent className="w-[500px] ml-auto h-full">
           <DrawerHeader>
@@ -236,9 +247,7 @@ export function ${componentName}() {
             />
           </div>
         </DrawerContent>
-      </Drawer>`
-          : ""
-      }
+      </Drawer>
     </>
   )
 }
