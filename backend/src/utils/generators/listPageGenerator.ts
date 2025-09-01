@@ -68,12 +68,13 @@ import * as React from "react"
 import { Link, useSearchParams } from "react-router-dom"
 import { useTranslation } from "react-i18next";
 import { flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, getSortedRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table"
-import { ArrowUpDown, Plus, Eye, Pencil, Trash2, Upload, Download } from "lucide-react"
+import { ArrowUpDown, Plus, Eye, Pencil, Trash2, Upload, Download, MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ${formComponentName} } from "@/components/forms/${modelDirName}/${formComponentName}";
 
 ${modelTypeDefinition}
@@ -115,8 +116,6 @@ export function ${componentName}() {
     setIsViewDrawerOpen(true);
   };
 
-
-
   const handleFormSubmit = (values: any) => {
     console.log("Form submitted from drawer:", values);
     if (editingRow) {
@@ -136,7 +135,22 @@ export function ${componentName}() {
   const confirmDelete = () => { if (!itemToDelete) return; if (Array.isArray(itemToDelete)) { const idSet = new Set(itemToDelete); setData(d => d.filter(item => !idSet.has(item.id))); table.resetRowSelection(); } else { setData(d => d.filter(item => item.id !== itemToDelete)); } setIsAlertOpen(false); setItemToDelete(null); };
 
   const columns: ColumnDef<${modelTypeName}>[] = React.useMemo(() => [
-    { id: "select", header: ({ table }) => <Checkbox checked={table.getIsAllPageRowsSelected()} onCheckedChange={v => table.toggleAllPageRowsSelected(!!v)} />, cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={v => row.toggleSelected(!!v)} />, enableSorting: false },
+    { 
+      id: "select", 
+      header: ({ table }) => (
+        <Checkbox 
+          checked={table.getIsAllPageRowsSelected()} 
+          onCheckedChange={v => table.toggleAllPageRowsSelected(!!v)} 
+        />
+      ), 
+      cell: ({ row }) => (
+        <Checkbox 
+          checked={row.getIsSelected()} 
+          onCheckedChange={v => row.toggleSelected(!!v)} 
+        />
+      ), 
+      enableSorting: false 
+    },
     ${fieldsForListing
       .map((field) => {
         const displayKey = field.fieldName.endsWith("_id")
@@ -146,70 +160,204 @@ export function ${componentName}() {
       accessorKey: "${sanitizeFieldName(field.fieldName)}", 
       header: ({ column }) => (${
         field.sortable
-          ? `<Button variant=\"ghost\" onClick={() => column.toggleSorting(column.getIsSorted() === \"asc\")}>{t(\"${singleModel}.fields.${displayKey}\")}<ArrowUpDown className=\"ml-2 h-4 w-4\" /></Button>`
-          : `<span>{t(\"${singleModel}.fields.${displayKey}\")}</span>`
+          ? `<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")} className="h-auto p-0 font-medium">
+              {t("${singleModel}.fields.${displayKey}")}
+              <ArrowUpDown className="ml-2 h-4 w-4" />
+            </Button>`
+          : `<span className="font-medium">{t("${singleModel}.fields.${displayKey}")}</span>`
       }),
-      ${field.sortable ? `cell: ({ getValue }) => (<div className=\"pl-5\">{String(getValue() ?? '')}</div>)` : ``}
+      ${field.sortable ? `cell: ({ getValue }) => (<div className="pl-4">{String(getValue() ?? '')}</div>)` : `cell: ({ getValue }) => String(getValue() ?? '')`}
     }`;
       })
       .join(",\n    ")},
-    { id: "actions", header: () => <div className="text-right">{t('common.actions')}</div>, cell: ({ row }) => (<div className="flex items-center justify-end gap-1">
-      <Button variant="ghost" size="icon" title={t('common.view')} onClick={() => handleView(row.original)}><Eye className="h-4 w-4" /></Button>
-      <Button variant="ghost" size="icon" title={t('common.edit')} onClick={() => handleEdit(row.original)}><Pencil className="h-4 w-4" /></Button>
-      <Button variant="ghost" size="icon" title={t('common.delete')} className="text-red-600" onClick={() => handleDeleteRow(row.original.id)}><Trash2 className="h-4 w-4" /></Button>
-    </div>) },
+    { 
+      id: "actions", 
+      header: () => <div className="text-right">{t('common.actions')}</div>, 
+      cell: ({ row }) => (
+        <div className="flex items-center justify-end gap-1">
+          {/* Desktop actions */}
+          <div className="hidden sm:flex items-center gap-1">
+            <Button variant="ghost" size="icon" title={t('common.view')} onClick={() => handleView(row.original)}>
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" title={t('common.edit')} onClick={() => handleEdit(row.original)}>
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" title={t('common.delete')} className="text-red-600" onClick={() => handleDeleteRow(row.original.id)}>
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* Mobile actions */}
+          <div className="sm:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleView(row.original)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  {t('common.view')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleEdit(row.original)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  {t('common.edit')}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleDeleteRow(row.original.id)}
+                  className="text-red-600"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {t('common.delete')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      ) 
+    },
   ], [t]);
 
-  const table = useReactTable({ data, columns, onSortingChange: setSorting, onColumnFiltersChange: setColumnFilters, onRowSelectionChange: setRowSelection, getCoreRowModel: getCoreRowModel(), getPaginationRowModel: getPaginationRowModel(), getSortedRowModel: getSortedRowModel(), getFilteredRowModel: getFilteredRowModel(), state: { sorting, columnFilters, rowSelection } });
+  const table = useReactTable({ 
+    data, 
+    columns, 
+    onSortingChange: setSorting, 
+    onColumnFiltersChange: setColumnFilters, 
+    onRowSelectionChange: setRowSelection,
+    getCoreRowModel: getCoreRowModel(), 
+    getPaginationRowModel: getPaginationRowModel(), 
+    getSortedRowModel: getSortedRowModel(), 
+    getFilteredRowModel: getFilteredRowModel(), 
+    state: { sorting, columnFilters, rowSelection } 
+  });
 
   return (
     <>
       <div className="w-full rounded-xl border bg-card shadow-sm p-4 md:p-6">
-        <div className="flex items-center justify-between gap-4 py-4">
-          <h1 className="text-2xl font-bold">{t('table.manageTitle', { model: t('models.${singleModel}_plural') })}</h1>
-          <div className="flex items-center gap-2">
-            {table.getFilteredSelectedRowModel().rows.length > 0 && (<Button variant="destructive" size="sm" onClick={handleDeleteSelected}>{t('table.deleteSelected', { count: table.getFilteredSelectedRowModel().rows.length })}</Button>)}
-            <Button variant="outline" size="sm" onClick={() => alert('Import functionality to be implemented.')}>
-              <Upload className="h-4 w-4 mr-2" /> {t('common.import')}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => alert('Export functionality to be implemented.')}>
-              <Download className="h-4 w-4 mr-2" /> {t('common.export')}
-            </Button>
-            <Button size="sm" onClick={handleCreate}><Plus className="h-4 w-4 mr-2" /> {t('common.new')} {t('models.${singleModel}')}</Button>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-4">
+          <h1 className="text-xl sm:text-2xl font-bold">{t('table.manageTitle', { model: t('models.${singleModel}_plural') })}</h1>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            {table.getFilteredSelectedRowModel().rows.length > 0 && (
+              <Button variant="destructive" size="sm" onClick={handleDeleteSelected} className="w-full sm:w-auto">
+                {t('table.deleteSelected', { count: table.getFilteredSelectedRowModel().rows.length })}
+              </Button>
+            )}
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" onClick={() => alert('Import functionality to be implemented.')} className="flex-1 sm:flex-none">
+                <Upload className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">{t('common.import')}</span>
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => alert('Export functionality to be implemented.')} className="flex-1 sm:flex-none">
+                <Download className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">{t('common.export')}</span>
+              </Button>
+              <Button size="sm" onClick={handleCreate} className="flex-1 sm:flex-none">
+                <Plus className="h-4 w-4 mr-2" />
+                <span className="hidden sm:inline">{t('common.new')} {t('models.${singleModel}')}</span>
+                <span className="sm:hidden">{t('common.new')}</span>
+              </Button>
+            </div>
           </div>
         </div>
-        <div className="rounded-md border">
+        
+        <div className="rounded-md border overflow-x-auto">
           <Table>
-            <TableHeader>{table.getHeaderGroups().map(hg => (<TableRow key={hg.id}>{hg.headers.map(h => (<TableHead key={h.id}>{flexRender(h.column.columnDef.header, h.getContext())}</TableHead>))}</TableRow>))}</TableHeader>
-            <TableBody>{table.getRowModel().rows.length ? table.getRowModel().rows.map(row => (<TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>{row.getVisibleCells().map(cell => (<TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>))}</TableRow>)) : (<TableRow><TableCell colSpan={columns.length} className="h-24 text-center">{t('common.noResults')}</TableCell></TableRow>)}</TableBody>
+            <TableHeader>
+              {table.getHeaderGroups().map(hg => (
+                <TableRow key={hg.id}>
+                  {hg.headers.map(h => (
+                    <TableHead key={h.id} className="whitespace-nowrap">
+                      {flexRender(h.column.columnDef.header, h.getContext())}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows.length ? 
+                table.getRowModel().rows.map(row => (
+                  <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
+                    {row.getVisibleCells().map(cell => (
+                      <TableCell key={cell.id} className="whitespace-nowrap">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={columns.length} className="h-24 text-center">
+                      {t('common.noResults')}
+                    </TableCell>
+                  </TableRow>
+                )
+              }
+            </TableBody>
           </Table>
         </div>
-        <div className="flex items-center justify-between space-x-4 py-4">
-          <div className="text-sm text-muted-foreground">{t('common.selected', { count: table.getFilteredSelectedRowModel().rows.length, total: table.getFilteredRowModel().rows.length })}</div>
-          <div className="flex items-center gap-2"><Button variant="outline" size="sm" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()}>{t('common.previous')}</Button><Button variant="outline" size="sm" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()}>{t('common.next')}</Button></div>
+        
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
+          <div className="text-sm text-muted-foreground order-2 sm:order-1">
+            {t('common.selected', { count: table.getFilteredSelectedRowModel().rows.length, total: table.getFilteredRowModel().rows.length })}
+          </div>
+          <div className="flex items-center gap-2 order-1 sm:order-2">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => table.previousPage()} 
+              disabled={!table.getCanPreviousPage()}
+            >
+              {t('common.previous')}
+            </Button>
+            <div className="text-sm text-muted-foreground px-2">
+              {table.getState().pagination.pageIndex + 1} / {table.getPageCount()}
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => table.nextPage()} 
+              disabled={!table.getCanNextPage()}
+            >
+              {t('common.next')}
+            </Button>
+          </div>
         </div>
       </div>
       
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-        <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>{t('common.areYouSure')}</AlertDialogTitle><AlertDialogDescription>{t('common.areYouSureDescription')}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel onClick={() => setItemToDelete(null)}>{t('common.cancel')}</AlertDialogCancel><AlertDialogAction onClick={confirmDelete}>{t('common.continue')}</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('common.areYouSure')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('common.areYouSureDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setItemToDelete(null)}>
+              {t('common.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>
+              {t('common.continue')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
       </AlertDialog>
 
       {/* View Drawer */}
       <Drawer open={isViewDrawerOpen} onOpenChange={setIsViewDrawerOpen} direction="right">
-        <DrawerContent className="w-[500px] ml-auto h-full">
+        <DrawerContent className="w-full sm:w-[500px] ml-auto h-full">
           <DrawerHeader>
             <DrawerTitle>{t('form.viewTitle', { model: t('models.${singleModel}') })}</DrawerTitle>
           </DrawerHeader>
-          <div className="p-6 overflow-y-auto">
-            <div className="grid auto-rows-min gap-y-6">
+          <div className="p-4 sm:p-6 overflow-y-auto">
+            <div className="grid auto-rows-min gap-y-4 sm:gap-y-6">
               ${fieldsForDialog
                 .map((field) => {
                   const displayKey = field.fieldName.endsWith("_id")
                     ? field.fieldName.replace(/_id$/, "")
                     : field.fieldName;
-                  return `<div className="grid grid-cols-3 items-start gap-x-4">
+                  return `<div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-x-4">
                 <span className="text-sm font-medium text-muted-foreground">{t("${singleModel}.fields.${displayKey}")}</span>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <p className="text-sm">{String(viewingRow?.${sanitizeFieldName(
                     field.fieldName
                   )} ?? '')}</p>
@@ -218,15 +366,21 @@ export function ${componentName}() {
                 })
                 .join("")}
             </div>
-            <div className="flex justify-end gap-2 pt-6 mt-6 border-t">
-              <Button variant="outline" onClick={() => setIsViewDrawerOpen(false)}>{t('common.close')}</Button>
-              <Button onClick={() => { 
-                if (viewingRow) {
-                  setIsViewDrawerOpen(false);
-                  handleEdit(viewingRow); 
-                }
-              }}>
-                <Pencil className="mr-2 h-4 w-4" /> {t('common.edit')}
+            <div className="flex flex-col sm:flex-row justify-end gap-2 pt-6 mt-6 border-t">
+              <Button variant="outline" onClick={() => setIsViewDrawerOpen(false)} className="w-full sm:w-auto">
+                {t('common.close')}
+              </Button>
+              <Button 
+                onClick={() => { 
+                  if (viewingRow) {
+                    setIsViewDrawerOpen(false);
+                    handleEdit(viewingRow); 
+                  }
+                }}
+                className="w-full sm:w-auto"
+              >
+                <Pencil className="mr-2 h-4 w-4" /> 
+                {t('common.edit')}
               </Button>
             </div>
           </div>
@@ -235,11 +389,13 @@ export function ${componentName}() {
 
       {/* Form Drawer */}
       <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen} direction="right">
-        <DrawerContent className="w-[500px] ml-auto h-full">
+        <DrawerContent className="w-full sm:w-[500px] ml-auto h-full">
           <DrawerHeader>
-            <DrawerTitle>{editingRow ? t('form.editTitle', { model: t('models.${singleModel}') }) : t('form.createTitle', { model: t('models.${singleModel}') })}</DrawerTitle>
+            <DrawerTitle>
+              {editingRow ? t('form.editTitle', { model: t('models.${singleModel}') }) : t('form.createTitle', { model: t('models.${singleModel}') })}
+            </DrawerTitle>
           </DrawerHeader>
-          <div className="p-6 overflow-y-auto">
+          <div className="p-4 sm:p-6 overflow-y-auto">
             <${formComponentName}
               initialData={editingRow || {}}
               onSubmit={handleFormSubmit}

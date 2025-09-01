@@ -12,8 +12,8 @@ import React from "react";
 import { ThemeProvider } from "@/components/theme-provider";
 import { I18nextProvider } from "react-i18next";
 import i18n from "./i18n";
-import { Provider } from "react-redux";
-import store from "./store";
+
+
 import { RouterProvider } from "react-router-dom";
 import routes from "@/routes/routes";
 
@@ -21,11 +21,11 @@ function App() {
   return (
     <React.Suspense fallback="Loading...">
       <I18nextProvider i18n={i18n}>
-        <Provider store={store}>
+      
           <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
             <RouterProvider router={routes} />
           </ThemeProvider>
-        </Provider>
+      
       </I18nextProvider>
     </React.Suspense>
   );

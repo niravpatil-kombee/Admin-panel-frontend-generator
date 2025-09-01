@@ -18,8 +18,7 @@ import { generateListPage } from "./generators/listPageGenerator";
 import { generateDashboard } from "./generators/dashboardGenerator";
 import { generateIndexCss } from "./generators/indexCssGenerator";
 import { generateLogin } from "./generators/loginGenerator";
-import { generateApiSetup } from "./generators/reduxSetupGenerator";
-import { generateReduxThunks } from "./generators/reduxThunkGenerator";
+
 import { generateI18n } from "./generators/i18Generator";
 import { generateLanguageSwitcher } from "./generators/languageSwitcherGenerator";
 
@@ -52,10 +51,6 @@ router.post("/generate", upload.single("file"), async (req, res) => {
     console.log("Generating theme components...");
     generateThemeProvider();
     generateThemeToggle();
-
-    console.log("Generating Axios API setup...");
-    generateApiSetup();
-    generateReduxThunks(modelNames, models);
     
     console.log("Generating i18n setup...");
     generateI18n(modelNames); 

@@ -131,12 +131,12 @@ function generateFormField(field: Field, modelName: string): string {
   const singleModel = modelName.toLowerCase();
   const isIdField = field.fieldName.toLowerCase().includes('id') || field.fieldName.toLowerCase().endsWith('_id');
   const displayKey = isIdField ? field.fieldName.replace(/_id$/, "") : field.fieldName;
-  const commonLabel = `<FormLabel>{t("${singleModel}.fields.${displayKey}")}</FormLabel>`;
+  const commonLabel = `<FormLabel className="text-sm font-medium">{t("${singleModel}.fields.${displayKey}")}</FormLabel>`;
   let control: string;
 
   switch (field.uiType) {
     case "textarea":
-      control = `<Textarea className="bg-background" placeholder={t("${singleModel}.placeholders.${displayKey}")} {...field} />`;
+      control = `<Textarea className="bg-background min-h-[80px]" placeholder={t("${singleModel}.placeholders.${displayKey}")} {...field} />`;
       break;
 
     case "select":
@@ -158,7 +158,7 @@ function generateFormField(field: Field, modelName: string): string {
         : `field.value ?? ''`;
 
       control = `<Select onValueChange={${onChangeLogic}} value={${valueLogic}}>
-        <SelectTrigger className="w-full bg-background" style={{ height: '2.75rem' }}>
+        <SelectTrigger className="w-full bg-background h-10">
           <SelectValue placeholder={t("${singleModel}.placeholders.${displayKey}")} />
         </SelectTrigger>
         <SelectContent>
@@ -169,7 +169,7 @@ function generateFormField(field: Field, modelName: string): string {
 
     case "checkbox":
       return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
-        <FormItem className="flex items-center gap-x-3 space-y-0 pt-8">
+        <FormItem className="flex items-center gap-x-3 space-y-0 pt-6">
           <FormControl>
             <Checkbox checked={field.value} onCheckedChange={field.onChange} />
           </FormControl>
@@ -179,7 +179,7 @@ function generateFormField(field: Field, modelName: string): string {
 
     case "switch":
       return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
-        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm mt-6 bg-background">
+        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm bg-background">
           <div className="space-y-0.5">${commonLabel}</div>
           <FormControl>
             <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -199,7 +199,7 @@ function generateFormField(field: Field, modelName: string): string {
         })
         .join("\n              ");
 
-      control = `<RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center space-x-4 pt-2">
+      control = `<RadioGroup onValueChange={field.onChange} value={field.value} className="flex flex-col sm:flex-row items-start sm:items-center space-y-2 sm:space-y-0 sm:space-x-4 pt-2">
         ${radioOptions}
       </RadioGroup>`;
       break;
@@ -217,21 +217,24 @@ function generateFormField(field: Field, modelName: string): string {
         <div
           {...getRootPropsFor${capFieldName}()}
           className={cn(
-            "bg-background flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-0 cursor-pointer transition",
+            "bg-background flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-6 cursor-pointer transition hover:border-primary/50",
             is${capFieldName}DragActive ? "border-primary bg-muted" : "border-muted-foreground/25"
           )}
         >
           <input {...getInputPropsFor${capFieldName}()} />
-          <CloudUpload className="text-muted-foreground" />
+          <CloudUpload className="text-muted-foreground mb-2" />
           {${field.fieldName}File ? (
-            <div className="flex flex-col items-center text-center mt-4">
+            <div className="flex flex-col items-center text-center">
               {${field.fieldName}File.type.startsWith("image/") && 
                 <img src={URL.createObjectURL(${field.fieldName}File)} alt="Preview" className="h-20 w-20 rounded-full object-cover mb-2" />
               }
               <p className="text-sm text-foreground">{${field.fieldName}File.name}</p>
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground ">{t('common.dragAndDrop')}</p>
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground mb-1">{t('common.dragAndDrop')}</p>
+              <p className="text-xs text-muted-foreground">{t('common.clickToSelect')}</p>
+            </div>
           )}
         </div>
       </FormControl>
@@ -241,7 +244,7 @@ function generateFormField(field: Field, modelName: string): string {
 />`;
 
     case "color":
-      control = `<Input type="color" className="bg-background" style={{ height: '2.75rem' }} {...field} />`;
+      control = `<Input type="color" className="bg-background h-10 w-full" {...field} />`;
       break;
 
     case "datepicker":
@@ -252,9 +255,9 @@ function generateFormField(field: Field, modelName: string): string {
             <PopoverTrigger asChild>
               <FormControl>
                 <Button variant={"outline"} className={cn(
-                  "w-full bg-background pl-3 text-left font-normal",
+                  "w-full bg-background pl-3 text-left font-normal h-10",
                   !field.value && "text-muted-foreground"
-                )} style={{ height: '2.75rem' }}>
+                )}>
                   {field.value ? (format(field.value, "PPP")) : (<span>{t('common.pickADate')}</span>)}
                   <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                 </Button>
@@ -278,7 +281,7 @@ function generateFormField(field: Field, modelName: string): string {
 
       if (field.fieldName.toLowerCase().includes("password")) {
         control = `<div className="relative">
-          <Input type={showPassword ? "text" : "password"} className="bg-background pr-10" placeholder={t("${singleModel}.placeholders.${displayKey}")} style={{ height: '2.75rem' }} {...field} />
+          <Input type={showPassword ? "text" : "password"} className="bg-background pr-10 h-10" placeholder={t("${singleModel}.placeholders.${displayKey}")} {...field} />
           <Button
             type="button"
             variant="ghost"
@@ -290,7 +293,7 @@ function generateFormField(field: Field, modelName: string): string {
           </Button>
         </div>`;
       } else {
-        control = `<Input type="${inputType}" className="bg-background" placeholder={t("${singleModel}.placeholders.${displayKey}")} style={{ height: '2.75rem' }} {...field} />`;
+        control = `<Input type="${inputType}" className="bg-background h-10" placeholder={t("${singleModel}.placeholders.${displayKey}")} {...field} />`;
       }
   }
 
@@ -457,12 +460,16 @@ ${dropzoneHooks}
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
 ${mainFormFields}
         </div>
-        <div className="flex justify-end gap-2 pt-4">
-          <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>{t('common.cancel')}</Button>
-          <Button type="submit" disabled={isLoading}>{isLoading ? t('common.saving') : t('common.save')}</Button>
+        <div className="flex flex-col sm:flex-row justify-end gap-2 pt-6 border-t">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading} className="w-full sm:w-auto">
+            {t('common.cancel')}
+          </Button>
+          <Button type="submit" disabled={isLoading} className="w-full sm:w-auto">
+            {isLoading ? t('common.saving') : t('common.save')}
+          </Button>
         </div>
       </form>
     </Form>
