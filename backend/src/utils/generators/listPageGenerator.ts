@@ -71,6 +71,7 @@ import { flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel
 import { ArrowUpDown, Plus, Eye, Pencil, Trash2, Upload, Download, MoreHorizontal } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
@@ -131,8 +132,23 @@ export function ${componentName}() {
   };
 
   const handleDeleteRow = (id: any) => { setItemToDelete(id); setIsAlertOpen(true); };
-  const handleDeleteSelected = () => { const ids = table.getFilteredSelectedRowModel().rows.map(r => r.original.id); setItemToDelete(ids); setIsAlertOpen(true); };
-  const confirmDelete = () => { if (!itemToDelete) return; if (Array.isArray(itemToDelete)) { const idSet = new Set(itemToDelete); setData(d => d.filter(item => !idSet.has(item.id))); table.resetRowSelection(); } else { setData(d => d.filter(item => item.id !== itemToDelete)); } setIsAlertOpen(false); setItemToDelete(null); };
+  const handleDeleteSelected = () => { 
+    const ids = table.getFilteredSelectedRowModel().rows.map(r => r.original.id); 
+    setItemToDelete(ids); 
+    setIsAlertOpen(true); 
+  };
+  const confirmDelete = () => { 
+    if (!itemToDelete) return; 
+    if (Array.isArray(itemToDelete)) { 
+      const idSet = new Set(itemToDelete); 
+      setData(d => d.filter(item => !idSet.has(item.id))); 
+      table.resetRowSelection(); 
+    } else { 
+      setData(d => d.filter(item => item.id !== itemToDelete)); 
+    } 
+    setIsAlertOpen(false); 
+    setItemToDelete(null); 
+  };
 
   const columns: ColumnDef<${modelTypeName}>[] = React.useMemo(() => [
     { 
@@ -175,46 +191,15 @@ export function ${componentName}() {
       header: () => <div className="text-right">{t('common.actions')}</div>, 
       cell: ({ row }) => (
         <div className="flex items-center justify-end gap-1">
-          {/* Desktop actions */}
-          <div className="hidden sm:flex items-center gap-1">
-            <Button variant="ghost" size="icon" title={t('common.view')} onClick={() => handleView(row.original)}>
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" title={t('common.edit')} onClick={() => handleEdit(row.original)}>
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" title={t('common.delete')} className="text-red-600" onClick={() => handleDeleteRow(row.original.id)}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-          
-          {/* Mobile actions */}
-          <div className="sm:hidden">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleView(row.original)}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  {t('common.view')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleEdit(row.original)}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  {t('common.edit')}
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => handleDeleteRow(row.original.id)}
-                  className="text-red-600"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {t('common.delete')}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          <Button variant="ghost" size="icon" title={t('common.view')} onClick={() => handleView(row.original)}>
+            <Eye className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" title={t('common.edit')} onClick={() => handleEdit(row.original)}>
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" title={t('common.delete')} className="text-red-600" onClick={() => handleDeleteRow(row.original.id)}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
         </div>
       ) 
     },
@@ -233,13 +218,76 @@ export function ${componentName}() {
     state: { sorting, columnFilters, rowSelection } 
   });
 
+  const MobileCard = ({ row }: { row: any }) => {
+    const item = row.original;
+    
+    return (
+      <Card className="mb-4">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                checked={row.getIsSelected()}
+                onCheckedChange={(value) => row.toggleSelected(!!value)}
+              />
+              <div className="font-medium text-base">ID: {item.id}</div>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleView(item)}>
+                  <Eye className="mr-2 h-4 w-4" />
+                  {t('common.view')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleEdit(item)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  {t('common.edit')}
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => handleDeleteRow(item.id)}
+                  className="text-red-600"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  {t('common.delete')}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="space-y-3">
+            ${fieldsForListing
+              .map((field) => {
+                const displayKey = field.fieldName.endsWith("_id")
+                  ? field.fieldName.replace(/_id$/, "")
+                  : field.fieldName;
+                return `<div className="flex justify-between items-start py-1">
+              <span className="text-sm text-muted-foreground font-medium min-w-0 flex-shrink-0 pr-2">
+                {t("${singleModel}.fields.${displayKey}")}
+              </span>
+              <span className="text-sm text-right min-w-0 flex-1 break-words">
+                {String(item.${sanitizeFieldName(field.fieldName)} ?? '')}
+              </span>
+            </div>`;
+              })
+              .join("")}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <>
       <div className="w-full rounded-xl border bg-card shadow-sm p-4 md:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-4">
           <h1 className="text-xl sm:text-2xl font-bold">{t('table.manageTitle', { model: t('models.${singleModel}_plural') })}</h1>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            {table.getFilteredSelectedRowModel().rows.length > 0 && (
+            {(table.getFilteredSelectedRowModel().rows.length > 0) && (
               <Button variant="destructive" size="sm" onClick={handleDeleteSelected} className="w-full sm:w-auto">
                 {t('table.deleteSelected', { count: table.getFilteredSelectedRowModel().rows.length })}
               </Button>
@@ -262,7 +310,8 @@ export function ${componentName}() {
           </div>
         </div>
         
-        <div className="rounded-md border overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden lg:block rounded-md border overflow-x-auto">
           <Table>
             <TableHeader>
               {table.getHeaderGroups().map(hg => (
@@ -296,10 +345,28 @@ export function ${componentName}() {
             </TableBody>
           </Table>
         </div>
+
+        {/* Mobile Card View */}
+        <div className="lg:hidden">
+          {table.getRowModel().rows.length > 0 ? (
+            <div className="space-y-4">
+              {table.getRowModel().rows.map(row => (
+                <MobileCard key={row.id} row={row} />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              {t('common.noResults')}
+            </div>
+          )}
+        </div>
         
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
           <div className="text-sm text-muted-foreground order-2 sm:order-1">
-            {t('common.selected', { count: table.getFilteredSelectedRowModel().rows.length, total: table.getFilteredRowModel().rows.length })}
+            {t('common.selected', { 
+              count: table.getFilteredSelectedRowModel().rows.length, 
+              total: table.getFilteredRowModel().rows.length 
+            })}
           </div>
           <div className="flex items-center gap-2 order-1 sm:order-2">
             <Button 
