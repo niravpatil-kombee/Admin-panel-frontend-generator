@@ -1,4 +1,3 @@
-// src/utils/generators/routesGenerator.ts
 import fs from "fs";
 import path from "path";
 import { ModelConfig } from "../excelParser";
@@ -8,36 +7,82 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function generateAppRoutes(models: Record<string, ModelConfig>): void {
   const dir = path.join(getBaseDir(), "src", "routes");
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  // Generate imports - only need DataTable imports since forms are in drawers
-  const imports = Object.keys(models)
-    .map((modelName) => {
+  // Generate imports conditionally based on isPopup flag
+  const imports = Object.entries(models)
+    .map(([modelName, config]) => {
       const capitalizedName = capitalize(modelName);
-      return `import { ${capitalizedName}DataTable } from '../pages/${capitalizedName}/${capitalizedName}DataTable';`;
+      
+      // Every model gets a DataTable import
+      const tableImport = `import { ${capitalizedName}DataTable } from '../pages/${capitalizedName}/${capitalizedName}DataTable';`;
+      
+      // ONLY page-based (non-popup) models get Form imports for routing
+      if (!config.isPopup) {
+        const formImport = `import { ${capitalizedName}Form } from '../components/forms/${capitalizedName}/${capitalizedName}Form';`;
+        return `${tableImport}\n${formImport}`;
+      }
+      
+      return tableImport;
     })
     .join("\n");
 
-  // Generate routes - only listing pages since create/edit are handled by drawers
-  const routeTags = Object.keys(models)
-    .map((modelName) => {
+  // Generate routes conditionally based on isPopup flag
+  const routeTags = Object.entries(models)
+    .map(([modelName, config]) => {
       const capitalizedName = capitalize(modelName);
       const lower = modelName.toLowerCase();
       const plural = `${lower}s`;
 
-      return `      // Routes for ${capitalizedName} (Drawer CRUD)
-      {
-        path: "/${plural}",
-        element: <${capitalizedName}DataTable />
-      }`;
+      if (config.isPopup) {
+        // Popup models: Only listing route (forms handled in drawers)
+        return `
+        // ${capitalizedName} - Popup Forms (Drawer-based)
+        {
+          path: "/${plural}",
+          element: <${capitalizedName}DataTable />
+        }`;
+      } else {
+        // Page models: Full CRUD routes
+        return `
+        // ${capitalizedName} - Page Forms (Route-based)
+        {
+          path: "/${plural}",
+          element: <${capitalizedName}DataTable />
+        },
+        {
+          path: "/${lower}/create",
+          element: <${capitalizedName}Form 
+            onSubmit={(values) => {
+              console.log('Creating ${lower}:', values);
+              // Handle creation logic here
+            }}
+            onCancel={() => window.history.back()}
+            title="Create ${capitalizedName}"
+           
+          />
+        },
+        {
+          path: "/${lower}/edit/:id",
+          element: <${capitalizedName}Form 
+            onSubmit={(values) => {
+              console.log('Updating ${lower}:', values);
+              // Handle update logic here
+            }}
+            onCancel={() => window.history.back()}
+            title="Edit ${capitalizedName}"
+          
+          />
+        }`;
+      }
     })
-    .join(",\n");
+    .join(",");
 
   const content = `
 import '../App.css';
 import { createBrowserRouter } from 'react-router-dom';
 import DashboardLayout from '../layout/DashboardLayout';
 import Dashboard from '../pages/Dashboard';
-
 import { LoginPage } from '../pages/Auth/LoginPage';
 ${imports}
 
@@ -53,8 +98,7 @@ const routes = [
       {
         index: true,
         element: <Dashboard />
-      },
-${routeTags}
+      },${routeTags}
     ]
   }
 ];
@@ -62,12 +106,6 @@ ${routeTags}
 export default createBrowserRouter(routes);
 `;
 
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  
   fs.writeFileSync(path.join(dir, "routes.tsx"), content, "utf8");
-  console.log(
-    "✅ Generated App routes with drawer-based CRUD for all models."
-  );
+  console.log("✅ Generated smart routing with isPopup flag support - popup models use drawers, page models use dedicated routes.");
 }

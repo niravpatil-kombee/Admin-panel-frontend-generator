@@ -7,6 +7,7 @@ const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 const sanitizeFieldName = (name: string): string =>
   name.replace(/[^a-zA-Z0-9_]/g, "_");
+
 function mapToTsType(zodType: Field["zodType"]): string {
   switch (zodType) {
     case "number":
@@ -26,7 +27,7 @@ export function generateListPage(
   modelName: string,
   modelConfig: ModelConfig
 ): void {
-  const { fields } = modelConfig;
+  const { fields, isPopup } = modelConfig;
   const componentName = `${capitalize(modelName)}DataTable`;
   const formComponentName = `${capitalize(modelName)}Form`;
   const modelTypeName = capitalize(modelName);
@@ -44,6 +45,7 @@ export function generateListPage(
         `${sanitizeFieldName(field.fieldName)}: ${mapToTsType(field.zodType)};`
     )
     .join("\n  ")}\n};`;
+    
   const mockData = `\nconst mockData: ${modelTypeName}[] = [\n  ${Array.from(
     { length: 13 },
     (_, i) =>
@@ -63,6 +65,67 @@ export function generateListPage(
         .join(", ")} }`
   ).join(",\n  ")}\n];`;
 
+  // Generate different imports based on isPopup flag
+  const formImports = isPopup 
+    ? `import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"`
+    : `import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { useNavigate } from "react-router-dom"`;
+
+  // State variables based on form type
+  const stateVariables = isPopup 
+    ? `  const [isFormDrawerOpen, setIsFormDrawerOpen] = React.useState(false);
+  const [editingRow, setEditingRow] = React.useState<${modelTypeName} | null>(null);
+  const [isViewDrawerOpen, setIsViewDrawerOpen] = React.useState(false);`
+    : `  const navigate = useNavigate();
+  const [isViewDialogOpen, setIsViewDialogOpen] = React.useState(false);`;
+
+  // Create and Edit handlers based on form type
+  const createEditHandlers = isPopup 
+    ? `  const handleCreate = () => {
+    setEditingRow(null);
+    setIsFormDrawerOpen(true);
+  };
+
+  const handleEdit = (row: ${modelTypeName}) => {
+    setEditingRow(row);
+    setIsFormDrawerOpen(true);
+  };`
+    : `  const handleCreate = () => {
+    navigate(\`/${singleModel}/create\`);
+  };
+
+  const handleEdit = (row: ${modelTypeName}) => {
+    navigate(\`/${singleModel}/edit/\${row.id}\`);
+  };`;
+
+  // View handler based on form type
+  const viewHandler = isPopup 
+    ? `  const handleView = (row: ${modelTypeName}) => {
+    setViewingRow(row);
+    setIsViewDrawerOpen(true);
+  };`
+    : `  const handleView = (row: ${modelTypeName}) => {
+    setViewingRow(row);
+    setIsViewDialogOpen(true);
+  };`;
+
+  // Form submit handler (only needed for popup forms)
+  const formSubmitHandler = isPopup 
+    ? `  const handleFormSubmit = (values: any) => {
+    console.log("Form submitted:", values);
+    if (editingRow) {
+      // Update existing item
+      setData(d => d.map(item => item.id === editingRow.id ? { ...item, ...values } : item));
+    } else {
+      // Create new item
+      const newItem = { ...values, id: Math.max(...data.map(d => Number(d.id))) + 1 };
+      setData(d => [...d, newItem]);
+    }
+    setIsFormDrawerOpen(false);
+    setEditingRow(null);
+  };`
+    : ``;
+
   const componentContent = `
 import * as React from "react"
 import { Link, useSearchParams } from "react-router-dom"
@@ -74,9 +137,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"
+${formImports}
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { ${formComponentName} } from "@/components/forms/${modelDirName}/${formComponentName}";
+${isPopup ? `import { ${formComponentName} } from "@/components/forms/${modelDirName}/${formComponentName}";` : ''}
 
 ${modelTypeDefinition}
 ${mockData}
@@ -90,9 +153,7 @@ export function ${componentName}() {
   const [viewingRow, setViewingRow] = React.useState<${modelTypeName} | null>(null);
   const [isAlertOpen, setIsAlertOpen] = React.useState(false);
   const [itemToDelete, setItemToDelete] = React.useState<any>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = React.useState(false);
-  const [editingRow, setEditingRow] = React.useState<${modelTypeName} | null>(null);
-  const [isViewDrawerOpen, setIsViewDrawerOpen] = React.useState(false);
+${stateVariables}
   const [searchParams, setSearchParams] = useSearchParams();
 
   React.useEffect(() => {
@@ -102,34 +163,11 @@ export function ${componentName}() {
     }
   }, [searchParams]);
 
-  const handleCreate = () => {
-    setEditingRow(null);
-    setIsDrawerOpen(true);
-  };
+${createEditHandlers}
 
-  const handleEdit = (row: ${modelTypeName}) => {
-    setEditingRow(row);
-    setIsDrawerOpen(true);
-  };
+${viewHandler}
 
-  const handleView = (row: ${modelTypeName}) => {
-    setViewingRow(row);
-    setIsViewDrawerOpen(true);
-  };
-
-  const handleFormSubmit = (values: any) => {
-    console.log("Form submitted from drawer:", values);
-    if (editingRow) {
-      // Update existing item
-      setData(d => d.map(item => item.id === editingRow.id ? { ...item, ...values } : item));
-    } else {
-      // Create new item
-      const newItem = { ...values, id: Math.max(...data.map(d => Number(d.id))) + 1 };
-      setData(d => [...d, newItem]);
-    }
-    setIsDrawerOpen(false);
-    setEditingRow(null);
-  };
+${formSubmitHandler}
 
   const handleDeleteRow = (id: any) => { setItemToDelete(id); setIsAlertOpen(true); };
   const handleDeleteSelected = () => { 
@@ -325,7 +363,7 @@ export function ${componentName}() {
               ))}
             </TableHeader>
             <TableBody>
-              {table.getRowModel().rows.length ? 
+              {table.getRowModel().rows.length > 0 ? // Changed to > 0 for clarity, although length is truthy
                 table.getRowModel().rows.map(row => (
                   <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                     {row.getVisibleCells().map(cell => (
@@ -339,9 +377,8 @@ export function ${componentName}() {
                     <TableCell colSpan={columns.length} className="h-24 text-center">
                       {t('common.noResults')}
                     </TableCell>
-                  </TableRow>
-                )
-              }
+                  </TableRow> // Corrected: closing TableRow tag here
+                )}
             </TableBody>
           </Table>
         </div>
@@ -409,8 +446,36 @@ export function ${componentName}() {
         </AlertDialogContent>
       </AlertDialog>
 
+      ${generateViewContainer(isPopup, fieldsForDialog, singleModel)}
+
+      ${generateFormContainer(isPopup, formComponentName, singleModel)}
+    </>
+  )
+}`;
+
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+  const newFilePath = path.join(outputDir, `${componentName}.tsx`);
+  fs.writeFileSync(newFilePath, componentContent, "utf8");
+  
+  const formType = isPopup ? "with Drawer Form" : "with Page Navigation";
+  console.log(`✅ Generated Data Table ${formType} for ${modelName} at: ${newFilePath}`);
+}
+
+function generateViewContainer(
+  isPopup: boolean,
+  fieldsForDialog: Field[],
+  singleModel: string
+): string {
+  const containerType = isPopup ? "Drawer" : "Dialog";
+  const containerState = isPopup ? "isViewDrawerOpen" : "isViewDialogOpen";
+  const containerSetter = isPopup ? "setIsViewDrawerOpen" : "setIsViewDialogOpen";
+
+  if (isPopup) {
+    return `
       {/* View Drawer */}
-      <Drawer open={isViewDrawerOpen} onOpenChange={setIsViewDrawerOpen} direction="right">
+      <Drawer open={${containerState}} onOpenChange={${containerSetter}} direction="right">
         <DrawerContent className="w-full sm:w-[500px] ml-auto h-full">
           <DrawerHeader>
             <DrawerTitle>{t('form.viewTitle', { model: t('models.${singleModel}') })}</DrawerTitle>
@@ -422,25 +487,24 @@ export function ${componentName}() {
                   const displayKey = field.fieldName.endsWith("_id")
                     ? field.fieldName.replace(/_id$/, "")
                     : field.fieldName;
+                  const sanitizedFieldName = sanitizeFieldName(field.fieldName);
                   return `<div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-x-4">
                 <span className="text-sm font-medium text-muted-foreground">{t("${singleModel}.fields.${displayKey}")}</span>
                 <div className="col-span-1 sm:col-span-2">
-                  <p className="text-sm">{String(viewingRow?.${sanitizeFieldName(
-                    field.fieldName
-                  )} ?? '')}</p>
+                  <p className="text-sm">{String(viewingRow?.${sanitizedFieldName} ?? '')}</p>
                 </div>
               </div>`;
                 })
                 .join("")}
             </div>
             <div className="flex flex-col sm:flex-row justify-end gap-2 pt-6 mt-6 border-t">
-              <Button variant="outline" onClick={() => setIsViewDrawerOpen(false)} className="w-full sm:w-auto">
+              <Button variant="outline" onClick={() => ${containerSetter}(false)} className="w-full sm:w-auto">
                 {t('common.close')}
               </Button>
               <Button 
                 onClick={() => { 
                   if (viewingRow) {
-                    setIsViewDrawerOpen(false);
+                    ${containerSetter}(false);
                     handleEdit(viewingRow); 
                   }
                 }}
@@ -452,10 +516,64 @@ export function ${componentName}() {
             </div>
           </div>
         </DrawerContent>
-      </Drawer>
+      </Drawer>`;
+  } else {
+    return `
+      {/* View Dialog */}
+      <Dialog open={${containerState}} onOpenChange={${containerSetter}}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('form.viewTitle', { model: t('models.${singleModel}') })}</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="grid auto-rows-min gap-y-6">
+              ${fieldsForDialog
+                .map((field) => {
+                  const displayKey = field.fieldName.endsWith("_id")
+                    ? field.fieldName.replace(/_id$/, "")
+                    : field.fieldName;
+                  const sanitizedFieldName = sanitizeFieldName(field.fieldName);
+                  return `<div className="grid grid-cols-1 sm:grid-cols-3 items-start gap-x-4">
+                <span className="text-sm font-medium text-muted-foreground">{t("${singleModel}.fields.${displayKey}")}</span>
+                <div className="col-span-1 sm:col-span-2">
+                  <p className="text-sm">{String(viewingRow?.${sanitizedFieldName} ?? '')}</p>
+                </div>
+              </div>`;
+                })
+                .join("")}
+            </div>
+            <div className="flex flex-col sm:flex-row justify-end gap-4 pt-6 mt-6 border-t">
+              <Button variant="outline" onClick={() => ${containerSetter}(false)} className="sm:w-auto">
+                {t('common.close')}
+              </Button>
+              <Button 
+                onClick={() => { 
+                  if (viewingRow) {
+                    ${containerSetter}(false);
+                    handleEdit(viewingRow); 
+                  }
+                }}
+                className="sm:w-auto"
+              >
+                <Pencil className="mr-2 h-4 w-4" /> 
+                {t('common.edit')}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>`;
+  }
+}
 
+function generateFormContainer(
+  isPopup: boolean, 
+  formComponentName: string, 
+  singleModel: string
+): string {
+  if (isPopup) {
+    return `
       {/* Form Drawer */}
-      <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen} direction="right">
+      <Drawer open={isFormDrawerOpen} onOpenChange={setIsFormDrawerOpen} direction="right">
         <DrawerContent className="w-full sm:w-[500px] ml-auto h-full">
           <DrawerHeader>
             <DrawerTitle>
@@ -466,20 +584,13 @@ export function ${componentName}() {
             <${formComponentName}
               initialData={editingRow || {}}
               onSubmit={handleFormSubmit}
-              onCancel={() => setIsDrawerOpen(false)}
+              onCancel={() => setIsFormDrawerOpen(false)}
             />
           </div>
         </DrawerContent>
-      </Drawer>
-    </>
-  )
-}
-`;
-
-  if (!fs.existsSync(outputDir)) {
-    fs.mkdirSync(outputDir, { recursive: true });
+      </Drawer>`;
+  } else {
+    return `
+      {/* Page forms are handled by navigation - no form container needed here */}`;
   }
-  const newFilePath = path.join(outputDir, `${componentName}.tsx`);
-  fs.writeFileSync(newFilePath, componentContent, "utf8");
-  console.log(`✅ Generated Data Table for ${modelName} at: ${newFilePath}`);
 }

@@ -158,7 +158,7 @@ function generateFormField(field: Field, modelName: string): string {
         : `field.value ?? ''`;
 
       control = `<Select onValueChange={${onChangeLogic}} value={${valueLogic}}>
-        <SelectTrigger className="w-full bg-background h-10">
+        <SelectTrigger className="w-full bg-background h-12">
           <SelectValue placeholder={t("${singleModel}.placeholders.${displayKey}")} />
         </SelectTrigger>
         <SelectContent>
@@ -179,7 +179,7 @@ function generateFormField(field: Field, modelName: string): string {
 
     case "switch":
       return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
-        <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm bg-background">
+        <FormItem className="items-center justify-between">
           <div className="space-y-0.5">${commonLabel}</div>
           <FormControl>
             <Switch checked={field.value} onCheckedChange={field.onChange} />
@@ -217,7 +217,7 @@ function generateFormField(field: Field, modelName: string): string {
         <div
           {...getRootPropsFor${capFieldName}()}
           className={cn(
-            "bg-background flex flex-col items-center justify-center border-2 border-dashed rounded-lg p-6 cursor-pointer transition hover:border-primary/50",
+            "bg-background flex flex-col items-center justify-center border-2 border-dashed rounded-lg cursor-pointer transition hover:border-primary/50",
             is${capFieldName}DragActive ? "border-primary bg-muted" : "border-muted-foreground/25"
           )}
         >
@@ -226,14 +226,13 @@ function generateFormField(field: Field, modelName: string): string {
           {${field.fieldName}File ? (
             <div className="flex flex-col items-center text-center">
               {${field.fieldName}File.type.startsWith("image/") && 
-                <img src={URL.createObjectURL(${field.fieldName}File)} alt="Preview" className="h-20 w-20 rounded-full object-cover mb-2" />
+                <img src={URL.createObjectURL(${field.fieldName}File)} alt="Preview" className="h-20 w-20 rounded-full object-cover" />
               }
               <p className="text-sm text-foreground">{${field.fieldName}File.name}</p>
             </div>
           ) : (
             <div className="text-center">
               <p className="text-sm text-muted-foreground mb-1">{t('common.dragAndDrop')}</p>
-              <p className="text-xs text-muted-foreground">{t('common.clickToSelect')}</p>
             </div>
           )}
         </div>
@@ -244,7 +243,7 @@ function generateFormField(field: Field, modelName: string): string {
 />`;
 
     case "color":
-      control = `<Input type="color" className="bg-background h-10 w-full" {...field} />`;
+      control = `<Input type="color" className="bg-background h-12 w-full" {...field} />`;
       break;
 
     case "datepicker":
@@ -255,7 +254,7 @@ function generateFormField(field: Field, modelName: string): string {
             <PopoverTrigger asChild>
               <FormControl>
                 <Button variant={"outline"} className={cn(
-                  "w-full bg-background pl-3 text-left font-normal h-10",
+                  "w-full bg-background pl-3 text-left font-normal h-12",
                   !field.value && "text-muted-foreground"
                 )}>
                   {field.value ? (format(field.value, "PPP")) : (<span>{t('common.pickADate')}</span>)}
@@ -281,7 +280,7 @@ function generateFormField(field: Field, modelName: string): string {
 
       if (field.fieldName.toLowerCase().includes("password")) {
         control = `<div className="relative">
-          <Input type={showPassword ? "text" : "password"} className="bg-background pr-10 h-10" placeholder={t("${singleModel}.placeholders.${displayKey}")} {...field} />
+          <Input type={showPassword ? "text" : "password"} className="bg-background pr-10 h-12" placeholder={t("${singleModel}.placeholders.${displayKey}")} {...field} />
           <Button
             type="button"
             variant="ghost"
@@ -293,7 +292,7 @@ function generateFormField(field: Field, modelName: string): string {
           </Button>
         </div>`;
       } else {
-        control = `<Input type="${inputType}" className="bg-background h-10" placeholder={t("${singleModel}.placeholders.${displayKey}")} {...field} />`;
+        control = `<Input type="${inputType}" className="bg-background h-12" placeholder={t("${singleModel}.placeholders.${displayKey}")} {...field} />`;
       }
   }
 
@@ -349,7 +348,6 @@ export function generateFormComponent(modelName: string, modelConfig: ModelConfi
   const componentName = `${capitalize(modelName)}Form`;
   const outputDir = path.join(getBaseDir(), "src", "components", "forms", modelDirName);
 
-
   const hasDatePicker = modelConfig.fields.some((f) => f.uiType === "datepicker");
   const hasFileUpload = modelConfig.fields.some((f) => f.uiType === "file");
   const hasPassword = modelConfig.fields.some(f => f.fieldName.toLowerCase().includes("password"));
@@ -357,11 +355,16 @@ export function generateFormComponent(modelName: string, modelConfig: ModelConfi
   const zodSchemaFields = modelConfig.fields.map((f) => `    ${f.fieldName}: ${generateZodValidation(f, modelName)}`).join(",\n");
   const defaultValues = modelConfig.fields.map((f) => `      ${f.fieldName}: ${generateDefaultValue(f)}`).join(",\n");
 
-  const componentContent = generateDrawerFormComponent(modelName, componentName, zodSchemaFields, defaultValues, modelConfig.fields, hasDatePicker, hasFileUpload, hasPassword);
+  // Generate different form components based on isPopup flag
+  const componentContent = modelConfig.isPopup 
+    ? generateDrawerFormComponent(modelName, componentName, zodSchemaFields, defaultValues, modelConfig.fields, hasDatePicker, hasFileUpload, hasPassword)
+    : generatePageFormComponent(modelName, componentName, zodSchemaFields, defaultValues, modelConfig.fields, hasDatePicker, hasFileUpload, hasPassword);
 
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
   fs.writeFileSync(path.join(outputDir, `${componentName}.tsx`), componentContent, "utf8");
-  console.log(`✅ Generated Drawer Form for ${modelName} at: ${path.join(outputDir, `${componentName}.tsx`)}`);
+  
+  const formType = modelConfig.isPopup ? "Drawer Form" : "Page Form";
+  console.log(`✅ Generated ${formType} for ${modelName} at: ${path.join(outputDir, `${componentName}.tsx`)}`);
 }
 
 // --- DRAWER FORM COMPONENT GENERATOR ---
@@ -475,4 +478,152 @@ ${mainFormFields}
     </Form>
   );
 }`;
+}
+
+// --- PAGE FORM COMPONENT GENERATOR ---
+
+function generatePageFormComponent(modelName: string, componentName: string, zodSchema: string, defaultValues: string, fields: Field[], hasDatePicker: boolean, hasFileUpload: boolean, hasPassword: boolean): string {
+  const typeName = `${capitalize(modelName)}FormValues`;
+  const singleModel = modelName.toLowerCase();
+  const fileFields = fields.filter(f => f.uiType === 'file');
+
+  const mainFormFields = fields.map(field => {
+    const fieldJsx = generateFormField(field, modelName);
+    if (field.isRemoveInEditForm) {
+      return `          {!initialData?.id && (\n            <>${fieldJsx}</>\n          )}`;
+    }
+    return `          ${fieldJsx}`;
+  }).join("\n\n");
+
+  const lucideIcons = [];
+  if (hasFileUpload) lucideIcons.push('CloudUpload');
+  if (hasDatePicker) lucideIcons.push('CalendarIcon');
+  if (hasPassword) {
+      lucideIcons.push('Eye');
+      lucideIcons.push('EyeOff');
   }
+
+  const imports = [
+    `import { useForm } from "react-hook-form";`,
+    `import { zodResolver } from "@hookform/resolvers/zod";`,
+    `import * as z from "zod";`,
+    `import { useTranslation } from "react-i18next";`,
+    (hasFileUpload || hasPassword) && `import { useState } from "react";`,
+    hasFileUpload && `import { useDropzone } from "react-dropzone";`,
+    hasDatePicker && `import { format } from "date-fns";`,
+    lucideIcons.length > 0 && `import { ${lucideIcons.join(', ')} } from "lucide-react";`,
+    hasDatePicker && `import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";`,
+    hasDatePicker && `import { Calendar } from "@/components/ui/calendar";`,
+    `import { cn } from "@/lib/utils";`,
+    `import { Button } from "@/components/ui/button";`,
+    `import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";`,
+    `import { Input } from "@/components/ui/input";`,
+    `import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";`,
+    `import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";`,
+    `import { Checkbox } from "@/components/ui/checkbox";`,
+    `import { Switch } from "@/components/ui/switch";`,
+    `import { Textarea } from "@/components/ui/textarea";`,
+    `import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";`,
+    `import { Separator } from "@/components/ui/separator";`,
+  ].filter(Boolean).join('\n');
+
+  const stateHooks = fileFields.map(f => `  const [${f.fieldName}File, set${capitalize(f.fieldName)}File] = useState<File | null>(null);`).join('\n');
+  const passwordStateHook = hasPassword ? `  const [showPassword, setShowPassword] = useState(false);` : "";
+  const dropzoneHooks = fileFields.map(f => `
+  const { getRootProps: getRootPropsFor${capitalize(f.fieldName)}, getInputProps: getInputPropsFor${capitalize(f.fieldName)}, isDragActive: is${capitalize(f.fieldName)}DragActive } = useDropzone({
+    accept: { "image/*": [] },
+    multiple: false,
+    onDrop: (acceptedFiles) => {
+      const file = acceptedFiles[0];
+      if (file) {
+        set${capitalize(f.fieldName)}File(file);
+        form.setValue("${f.fieldName}", file as any);
+      }
+    },
+  });`).join('\n');
+
+  return `${imports}
+
+// Schema with translated error messages
+const ${capitalize(modelName)}Schema = (t: any) =>
+  z.object({
+${zodSchema}
+  });
+
+type ${typeName} = z.infer<ReturnType<typeof ${capitalize(modelName)}Schema>>;
+
+interface ${componentName}Props {
+  initialData?: Partial<${typeName}> & { id?: any };
+  onSubmit: (values: ${typeName} | FormData) => void;
+  onCancel: () => void;
+  isLoading?: boolean;
+  title?: string;
+  description?: string;
+}
+
+export function ${componentName}({ 
+  initialData, 
+  onSubmit, 
+  onCancel, 
+  isLoading = false,
+  title,
+  description 
+}: ${componentName}Props) {
+  const { t } = useTranslation();
+${stateHooks}
+${passwordStateHook}
+
+  const form = useForm<${typeName}>({
+    resolver: zodResolver(${capitalize(modelName)}Schema(t)),
+    defaultValues: {
+${defaultValues},
+      ...initialData,
+    },
+  });
+${dropzoneHooks}
+
+  ${generateOnSubmitFunction(modelName, fileFields)}
+
+  return (
+    <div className="container mx-auto py-6 max-w-8xl">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold">
+            {title || (initialData?.id ? t('${singleModel}.edit.title') : t('${singleModel}.create.title'))}
+          </CardTitle>
+          
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+${mainFormFields}
+              </div>
+              
+          
+              
+              <div className="flex flex-col sm:flex-row justify-end gap-4">
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={onCancel} 
+                  disabled={isLoading}
+                  className="sm:w-auto"
+                >
+                  {t('common.cancel')}
+                </Button>
+                <Button 
+                  type="submit" 
+                  disabled={isLoading}
+                  className="sm:w-auto"
+                >
+                  {isLoading ? t('common.saving') : t('common.save')}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}`;}

@@ -9,17 +9,21 @@ export function generateSidebar(models: Record<string, ModelConfig>): void {
   const dir = path.join(getBaseDir(), "src", "layout");
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 
-  const modelEntries = Object.keys(models).map((name) => {
+  const modelEntries = Object.entries(models).map(([name, config]) => {
     const lower = name.toLowerCase();
-    const createHref = `/${lower}s?action=create`;
-    return `{
+    const plural = `${lower}s`;
+
+    if (config.isPopup) {
+      // Popup models: Only list route with ?action=create for drawer opening
+      const createHref = `/${plural}?action=create`;
+      return `{
       label: t('models.${lower}_plural'),
       modelKey: '${lower}',
       icon: "Users",
       children: [
         {
           label: t('sidebar.allModels', { model: t('models.${lower}_plural') }),
-          href: \`/${lower}s\`,
+          href: \`/${plural}\`,
         },
         {
           label: t('sidebar.createModel', { model: t('models.${lower}') }),
@@ -27,10 +31,27 @@ export function generateSidebar(models: Record<string, ModelConfig>): void {
         }
       ]
     }`;
+    } else {
+      // Page models: Separate routes for create and edit
+      return `{
+      label: t('models.${lower}_plural'),
+      modelKey: '${lower}',
+      icon: "Users",
+      children: [
+        {
+          label: t('sidebar.allModels', { model: t('models.${lower}_plural') }),
+          href: \`/${plural}\`,
+        },
+        {
+          label: t('sidebar.createModel', { model: t('models.${lower}') }),
+          href: \`/${lower}/create\`,
+        }
+      ]
+    }`;
+    }
   });
 
- 
-const content = `
+  const content = `
 import * as React from "react";
 import { useState, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -40,8 +61,6 @@ import { Home, Users, Settings, ChevronLeft, ChevronRight, ChevronDown, Circle, 
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-
-
 
 const iconMap: { [key: string]: React.ElementType } = { Home, Users, Settings };
 
@@ -152,10 +171,10 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, setIsOpen, isMobile }: SidebarProps) {
   const location = useLocation();
   const { t } = useTranslation();
- const [openItem, setOpenItem] = useState<string | null>(null);
+  const [openItem, setOpenItem] = useState<string | null>(null);
   const onToggle = () => setIsOpen(!isOpen);
 
- const navItems = useMemo(() => [
+  const navItems = useMemo(() => [
     { label: t('common.dashboard'), href: "/", icon: "Home" },
     ...[${modelEntries.join(",\n    ")}]
   ], [t]);
@@ -180,13 +199,13 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }: SidebarProps) {
             <X size={18} />
           </Button>
         </div>
-        
+
         <ScrollArea className="flex-1">
           <nav className="p-4">
             <NavMenu items={navItems} pathname={location.pathname} isOpen={true} openItem={openItem} setOpenItem={setOpenItem} />
           </nav>
         </ScrollArea>
-        
+
         <div className="p-4 border-t border-gray-800">
           <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-800">
             <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
@@ -208,7 +227,7 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }: SidebarProps) {
       isOpen ? "w-72" : "w-16"
     )}>
       <div className={cn(
-        "p-4 border-b border-gray-800 flex items-center bg-gray-900", 
+        "p-4 border-b border-gray-800 flex items-center bg-gray-900",
         isOpen ? "justify-between" : "justify-center"
       )}>
         {isOpen && (
@@ -221,23 +240,23 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }: SidebarProps) {
             </div>
           </div>
         )}
-        <Button 
-          variant="ghost" 
-          size="icon" 
-          onClick={onToggle} 
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onToggle}
           className="text-white hover:bg-gray-700 flex-shrink-0"
         >
           {isOpen ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
         </Button>
       </div>
-      
+
       <ScrollArea className="flex-1">
         <nav className="p-2 space-y-1">
           <NavMenu items={navItems} pathname={location.pathname} isOpen={isOpen} openItem={openItem} setOpenItem={setOpenItem} />
         </nav>
       </ScrollArea>
-      
-      {isOpen && (
+
+      {isOpen && ( // Corrected: removed the extra ')' here
         <div className="p-4 border-t border-gray-800">
           <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-800">
             <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
@@ -255,5 +274,5 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }: SidebarProps) {
 }
 `;
   fs.writeFileSync(path.join(dir, "Sidebar.tsx"), content, "utf8");
-  console.log("✅ Generated responsive Sidebar component with accordion dropdowns, no background highlight, and no + icon.");
+  console.log("✅ Generated Sidebar with isPopup flag support - popup models use query params, page models use dedicated routes.");
 }
