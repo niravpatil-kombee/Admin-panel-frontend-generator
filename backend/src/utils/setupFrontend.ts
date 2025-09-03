@@ -30,7 +30,7 @@ export function setupFrontendProject(): void {
   // Step 2: Install general dependencies
   console.log("📦 Installing app dependencies...");
   execSync(
-    `npm install axios react-router-dom lucide-react class-variance-authority tailwind-variants react-hook-form zod @hookform/resolvers clsx tailwind-merge @tanstack/react-table date-fns react-dropzone @reduxjs/toolkit react-redux  react-i18next i18next-browser-languagedetector`,
+    `npm install axios react-router-dom lucide-react class-variance-authority tailwind-variants react-hook-form zod @hookform/resolvers clsx tailwind-merge @tanstack/react-table date-fns react-dropzone @reduxjs/toolkit react-redux  react-i18next i18next-browser-languagedetector react-phone-number-input`,
     frontendExecOptions
   );
 

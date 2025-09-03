@@ -14,6 +14,15 @@ function generateZodValidation(field: Field, modelName: string): string {
   // Check if this is an ID field and override the zodType to string
   const isIdField = field.fieldName.toLowerCase().includes('id') || field.fieldName.toLowerCase().endsWith('_id');
   
+    // --- PHONE SPECIAL CASE ---
+    if (field.fieldName.toLowerCase().includes("phone")) {
+      const requiredKey = `t("${singleModel}.validation.${field.fieldName}Required")`;
+      const invalidKey = `t("${singleModel}.validation.${field.fieldName}Invalid")`;
+      return `z.string().refine(val => !val || isValidPhoneNumber(val), { message: ${invalidKey} })${
+        field.required ? `.min(1, { message: ${requiredKey} })` : ".optional().nullable()"
+      }`;
+    }
+
   if (isIdField && field.zodType === "number") {
     zodChain = "z.string()";
   } else {
@@ -116,16 +125,19 @@ function generateZodValidation(field: Field, modelName: string): string {
 }
 
 function generateDefaultValue(field: Field): string {
-  const isIdField = field.fieldName.toLowerCase().includes('id') || field.fieldName.toLowerCase().endsWith('_id');
-  
+  const isIdField =
+    field.fieldName.toLowerCase().includes("id") ||
+    field.fieldName.toLowerCase().endsWith("_id");
+
+  if (field.fieldName.toLowerCase().includes("phone")) return '""';
   if (field.zodType === "boolean") return "false";
   if (field.zodType === "number" && !isIdField) return "0";
   if (field.zodType === "date") return "undefined";
   if (field.zodType === "any") return "null";
-  // For ID fields, return empty string instead of 0
   if (isIdField) return '""';
   return '""';
 }
+
 
 function generateFormField(field: Field, modelName: string): string {
   const singleModel = modelName.toLowerCase();
@@ -133,6 +145,25 @@ function generateFormField(field: Field, modelName: string): string {
   const displayKey = isIdField ? field.fieldName.replace(/_id$/, "") : field.fieldName;
   const commonLabel = `<FormLabel className="text-sm font-medium">{t("${singleModel}.fields.${displayKey}")}</FormLabel>`;
   let control: string;
+
+    // --- PHONE SPECIAL CASE ---
+    if (field.fieldName.toLowerCase().includes("phone")) {
+      return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
+        <FormItem>
+          ${commonLabel}
+          <FormControl>
+            <PhoneInput
+              international
+              defaultCountry="US"
+              value={field.value}
+              onChange={field.onChange}
+              className="bg-background h-12 w-full border rounded-md px-2"
+            />
+          </FormControl>
+          <FormMessage className="text-red-400 font-normal text-sm" />
+        </FormItem>
+      )} />`;
+    }  
 
   switch (field.uiType) {
     case "textarea":
@@ -410,6 +441,8 @@ function generateDrawerFormComponent(modelName: string, componentName: string, z
     `import { Checkbox } from "@/components/ui/checkbox";`,
     `import { Switch } from "@/components/ui/switch";`,
     `import { Textarea } from "@/components/ui/textarea";`,
+    `import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";`,
+    `import "react-phone-number-input/style.css";`,
   ].filter(Boolean).join('\n');
 
   const stateHooks = fileFields.map(f => `  const [${f.fieldName}File, set${capitalize(f.fieldName)}File] = useState<File | null>(null);`).join('\n');
@@ -525,6 +558,8 @@ function generatePageFormComponent(modelName: string, componentName: string, zod
     `import { Textarea } from "@/components/ui/textarea";`,
     `import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";`,
     `import { Separator } from "@/components/ui/separator";`,
+    `import PhoneInput, { isValidPhoneNumber } from "react-phone-number-input";`,
+    `import "react-phone-number-input/style.css";`,
   ].filter(Boolean).join('\n');
 
   const stateHooks = fileFields.map(f => `  const [${f.fieldName}File, set${capitalize(f.fieldName)}File] = useState<File | null>(null);`).join('\n');
