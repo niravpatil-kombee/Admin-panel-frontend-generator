@@ -26,7 +26,10 @@ const createBreadcrumbLabel = (segment: string, t: (key: string) => string): str
   if (t(modelKey) !== modelKey) {
     return t(modelKey);
   }
-  return segment.replace(/-/g, ' ').replace(/_/g, ' ').split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+  return segment.replace(/-/g, ' ').replace(/_/g, ' ')
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 };
 
 export default function Header({ onMenuClick }: HeaderProps) {
@@ -39,7 +42,10 @@ export default function Header({ onMenuClick }: HeaderProps) {
 
     let currentPath = "";
     pathParts.forEach((part) => {
-      currentPath += \`/\${part}\`;
+      // ✅ Ensure breadcrumb URLs are plural
+      const urlPart = part.endsWith("s") ? part : \`\${part}s\`;
+
+      currentPath += \`/\${urlPart}\`;
       crumbs.push({
         label: createBreadcrumbLabel(part, t),
         href: currentPath,
