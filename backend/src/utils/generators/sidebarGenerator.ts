@@ -11,11 +11,10 @@ export function generateSidebar(models: Record<string, ModelConfig>): void {
 
   const modelEntries = Object.entries(models).map(([name, config]) => {
     const lower = name.toLowerCase();
-    const plural = `${lower}s`;
 
     if (config.isPopup) {
       // Popup models: Only list route with ?action=create for drawer opening
-      const createHref = `/${plural}?action=create`;
+      const createHref = `/${lower}?action=create`;
       return `{
       label: t('models.${lower}_plural'),
       modelKey: '${lower}',
@@ -23,7 +22,7 @@ export function generateSidebar(models: Record<string, ModelConfig>): void {
       children: [
         {
           label: t('sidebar.allModels', { model: t('models.${lower}_plural') }),
-          href: \`/${plural}\`,
+          href: \`/${lower}\`,
         },
         {
           label: t('sidebar.createModel', { model: t('models.${lower}') }),
@@ -40,7 +39,7 @@ export function generateSidebar(models: Record<string, ModelConfig>): void {
       children: [
         {
           label: t('sidebar.allModels', { model: t('models.${lower}_plural') }),
-          href: \`/${plural}\`,
+          href: \`/${lower}\`,
         },
         {
           label: t('sidebar.createModel', { model: t('models.${lower}') }),
@@ -256,7 +255,7 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }: SidebarProps) {
         </nav>
       </ScrollArea>
 
-      {isOpen && ( // Corrected: removed the extra ')' here
+      {isOpen && (
         <div className="p-4 border-t border-gray-800">
           <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-800">
             <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
@@ -274,5 +273,5 @@ export default function Sidebar({ isOpen, setIsOpen, isMobile }: SidebarProps) {
 }
 `;
   fs.writeFileSync(path.join(dir, "Sidebar.tsx"), content, "utf8");
-  console.log("✅ Generated Sidebar with isPopup flag support - popup models use query params, page models use dedicated routes.");
+  console.log("✅ Generated Sidebar with singular model paths and isPopup query param support.");
 }
