@@ -45,7 +45,7 @@ export function generateListPage(
         `${sanitizeFieldName(field.fieldName)}: ${mapToTsType(field.zodType)};`
     )
     .join("\n  ")}\n};`;
-    
+
   const mockData = `\nconst mockData: ${modelTypeName}[] = [\n  ${Array.from(
     { length: 13 },
     (_, i) =>
@@ -60,19 +60,21 @@ export function generateListPage(
           if (tsType === "boolean") {
             return `${sName}: ${i % 2 === 0 ? "true" : "false"}`;
           }
-          return `${sName}: "${capitalize(f.fieldName.replace(/_/g, " "))} ${i + 1}"`;
+          return `${sName}: "${capitalize(f.fieldName.replace(/_/g, " "))} ${
+            i + 1
+          }"`;
         })
         .join(", ")} }`
   ).join(",\n  ")}\n];`;
 
   // Generate different imports based on isPopup flag
-  const formImports = isPopup 
+  const formImports = isPopup
     ? `import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer"`
     : `import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useNavigate } from "react-router-dom"`;
 
   // State variables based on form type
-  const stateVariables = isPopup 
+  const stateVariables = isPopup
     ? `  const [isFormDrawerOpen, setIsFormDrawerOpen] = React.useState(false);
   const [editingRow, setEditingRow] = React.useState<${modelTypeName} | null>(null);
   const [isViewDrawerOpen, setIsViewDrawerOpen] = React.useState(false);`
@@ -80,37 +82,48 @@ import { useNavigate } from "react-router-dom"`;
   const [isViewDialogOpen, setIsViewDialogOpen] = React.useState(false);`;
 
   // Create and Edit handlers based on form type
-  const createEditHandlers = isPopup 
+  const createEditHandlers = isPopup
     ? `  const handleCreate = () => {
     setEditingRow(null);
     setIsFormDrawerOpen(true);
   };
 
-  const handleEdit = (row: ${modelTypeName}) => {
-    setEditingRow(row);
-    setIsFormDrawerOpen(true);
-  };`
+const handleView = (id: any) => {
+  const row = data.find(item => item.id === id);
+  if (!row) return;
+  setViewingRow(row);
+  setIsViewDrawerOpen(true);
+};`
     : `  const handleCreate = () => {
     navigate(\`/${singleModel}/create\`);
   };
 
-  const handleEdit = (row: ${modelTypeName}) => {
-    navigate(\`/${singleModel}/edit/\${row.id}\`);
-  };`;
+  const handleEdit = (id: any) => {
+    navigate(\`/${singleModel}/edit/\${id}\`);
+  };
+  `;
 
   // View handler based on form type
-  const viewHandler = isPopup 
-    ? `  const handleView = (row: ${modelTypeName}) => {
-    setViewingRow(row);
-    setIsViewDrawerOpen(true);
-  };`
-    : `  const handleView = (row: ${modelTypeName}) => {
-    setViewingRow(row);
-    setIsViewDialogOpen(true);
-  };`;
+  const viewHandler = isPopup
+    ? `  const handleEdit = (id: any) => {
+  const row = data.find(item => item.id === id);
+  if (!row) return;
+  setEditingRow(row);
+  setIsFormDrawerOpen(true);
+};
+`
+    : `  
+   const handleView = (id: any) => {
+  const row = data.find(item => item.id === id);
+  if (!row) return;
+  setViewingRow(row);
+  setIsViewDialogOpen(true);
+};
+
+  `;
 
   // Form submit handler (only needed for popup forms)
-  const formSubmitHandler = isPopup 
+  const formSubmitHandler = isPopup
     ? `  const handleFormSubmit = (values: any) => {
     console.log("Form submitted:", values);
     if (editingRow) {
@@ -139,7 +152,11 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 ${formImports}
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-${isPopup ? `import { ${formComponentName} } from "@/components/forms/${modelDirName}/${formComponentName}";` : ''}
+${
+  isPopup
+    ? `import { ${formComponentName} } from "@/components/forms/${modelDirName}/${formComponentName}";`
+    : ""
+}
 
 ${modelTypeDefinition}
 ${mockData}
@@ -220,7 +237,11 @@ ${formSubmitHandler}
             </Button>`
           : `<span className="font-medium">{t("${singleModel}.fields.${displayKey}")}</span>`
       }),
-      ${field.sortable ? `cell: ({ getValue }) => (<div className="pl-4">{String(getValue() ?? '')}</div>)` : `cell: ({ getValue }) => String(getValue() ?? '')`}
+      ${
+        field.sortable
+          ? `cell: ({ getValue }) => (<div className="pl-4">{String(getValue() ?? '')}</div>)`
+          : `cell: ({ getValue }) => String(getValue() ?? '')`
+      }
     }`;
       })
       .join(",\n    ")},
@@ -229,10 +250,10 @@ ${formSubmitHandler}
       header: () => <div className="text-right">{t('common.actions')}</div>, 
       cell: ({ row }) => (
         <div className="flex items-center justify-end gap-1">
-          <Button variant="ghost" size="icon" title={t('common.view')} onClick={() => handleView(row.original)}>
+          <Button variant="ghost" size="icon" title={t('common.view')} onClick={() => handleView(row.original.id)}>
             <Eye className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" title={t('common.edit')} onClick={() => handleEdit(row.original)}>
+          <Button variant="ghost" size="icon" title={t('common.edit')} onClick={() => handleEdit(row.original.id)}>
             <Pencil className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon" title={t('common.delete')} className="text-red-600" onClick={() => handleDeleteRow(row.original.id)}>
@@ -277,11 +298,11 @@ ${formSubmitHandler}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleView(item)}>
+                <DropdownMenuItem onClick={() => handleView(item.id)}>
                   <Eye className="mr-2 h-4 w-4" />
                   {t('common.view')}
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleEdit(item)}>
+                <DropdownMenuItem onClick={() => handleEdit(item.id)}>
                   <Pencil className="mr-2 h-4 w-4" />
                   {t('common.edit')}
                 </DropdownMenuItem>
@@ -458,9 +479,11 @@ ${formSubmitHandler}
   }
   const newFilePath = path.join(outputDir, `${componentName}.tsx`);
   fs.writeFileSync(newFilePath, componentContent, "utf8");
-  
+
   const formType = isPopup ? "with Drawer Form" : "with Page Navigation";
-  console.log(`✅ Generated Data Table ${formType} for ${modelName} at: ${newFilePath}`);
+  console.log(
+    `✅ Generated Data Table ${formType} for ${modelName} at: ${newFilePath}`
+  );
 }
 
 function generateViewContainer(
@@ -470,7 +493,9 @@ function generateViewContainer(
 ): string {
   const containerType = isPopup ? "Drawer" : "Dialog";
   const containerState = isPopup ? "isViewDrawerOpen" : "isViewDialogOpen";
-  const containerSetter = isPopup ? "setIsViewDrawerOpen" : "setIsViewDialogOpen";
+  const containerSetter = isPopup
+    ? "setIsViewDrawerOpen"
+    : "setIsViewDialogOpen";
 
   if (isPopup) {
     return `
@@ -505,7 +530,7 @@ function generateViewContainer(
                 onClick={() => { 
                   if (viewingRow) {
                     ${containerSetter}(false);
-                    handleEdit(viewingRow); 
+                    handleEdit(viewingRow.id); 
                   }
                 }}
                 className="w-full sm:w-auto"
@@ -550,7 +575,7 @@ function generateViewContainer(
                 onClick={() => { 
                   if (viewingRow) {
                     ${containerSetter}(false);
-                    handleEdit(viewingRow); 
+                    handleEdit(viewingRow.id); 
                   }
                 }}
                 className="sm:w-auto"
@@ -566,8 +591,8 @@ function generateViewContainer(
 }
 
 function generateFormContainer(
-  isPopup: boolean, 
-  formComponentName: string, 
+  isPopup: boolean,
+  formComponentName: string,
   singleModel: string
 ): string {
   if (isPopup) {

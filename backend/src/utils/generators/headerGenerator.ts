@@ -43,9 +43,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
     let currentPath = "";
     pathParts.forEach((part) => {
       // ✅ Ensure breadcrumb URLs are plural
-      const urlPart = part.endsWith("s") ? part : \`\${part}s\`;
+      const urlPart = part;
 
-      currentPath += \`/\${urlPart}\`;
+    currentPath += \`/\${urlPart}\`;
       crumbs.push({
         label: createBreadcrumbLabel(part, t),
         href: currentPath,

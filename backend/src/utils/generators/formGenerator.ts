@@ -170,33 +170,35 @@ function generateFormField(field: Field, modelName: string): string {
       control = `<Textarea className="bg-background min-h-[80px]" placeholder={t("${singleModel}.placeholders.${displayKey}")} {...field} />`;
       break;
 
-    case "select":
-      const selectOptions = (field.options || ["Default 1", "Default 2"])
-        .map((opt) => {
-          // For ID fields (now treated as strings) or number fields, handle appropriately
-          const optionValue = (field.zodType === "number" && !isIdField) ? String(opt) : opt;
-          return `<SelectItem value="${optionValue}">${opt}</SelectItem>`;
-        })
-        .join("\n              ");
-
-      // Update onChange logic for ID fields
-      const onChangeLogic = (field.zodType === "number" && !isIdField)
-        ? `(val) => field.onChange(Number(val))`
-        : `field.onChange`;
-
-      const valueLogic = (field.zodType === "number" && !isIdField)
-        ? `String(field.value ?? '')`
-        : `field.value ?? ''`;
-
-      control = `<Select onValueChange={${onChangeLogic}} value={${valueLogic}}>
-        <SelectTrigger className="w-full bg-background h-12">
-          <SelectValue placeholder={t("${singleModel}.placeholders.${displayKey}")} />
-        </SelectTrigger>
-        <SelectContent>
-          ${selectOptions}
-        </SelectContent>
-      </Select>`;
-      break;
+      case "select":
+        const selectOptions = (field.options || ["Default 1", "Default 2"])
+          .map((opt, index) => {
+            // If it's an ID field -> store index (or real id later from API) as value
+            const optionValue = isIdField ? String(index + 1) : 
+                                (field.zodType === "number" && !isIdField ? String(opt) : opt);
+            return `<SelectItem value="${optionValue}">${opt}</SelectItem>`;
+          })
+          .join("\n              ");
+      
+        // Update onChange/value for ID fields
+        const onChangeLogic = isIdField
+          ? `field.onChange` // keep as string (ids are strings in schema)
+          : (field.zodType === "number" ? `(val) => field.onChange(Number(val))` : `field.onChange`);
+      
+        const valueLogic = isIdField
+          ? `field.value ?? ''`
+          : (field.zodType === "number" ? `String(field.value ?? '')` : `field.value ?? ''`);
+      
+        control = `<Select onValueChange={${onChangeLogic}} value={${valueLogic}}>
+          <SelectTrigger className="w-full bg-background h-12">
+            <SelectValue placeholder={t("${singleModel}.placeholders.${displayKey}")} />
+          </SelectTrigger>
+          <SelectContent>
+            ${selectOptions}
+          </SelectContent>
+        </Select>`;
+        break;
+      
 
     case "checkbox":
       return `<FormField control={form.control} name="${field.fieldName}" render={({ field }) => (
