@@ -10,7 +10,7 @@ const getBaseDir = () => path.resolve(process.cwd(), "..", "frontend");
  * This version has no external dependencies.
  */
 export function generateThemeProvider(): void {
-  const componentsDir = path.join(getBaseDir(), "src", "components");
+  const componentsDir = path.join(getBaseDir(), "src", "context");
   if (!fs.existsSync(componentsDir)) fs.mkdirSync(componentsDir, { recursive: true });
 
   const content = `
@@ -88,7 +88,7 @@ export const useTheme = () => {
   return context
 }
 `;
-  fs.writeFileSync(path.join(componentsDir, "theme-provider.tsx"), content, "utf8");
+  fs.writeFileSync(path.join(componentsDir, "themeContext.tsx"), content, "utf8");
   console.log("✅ Generated manual ThemeProvider component.");
 }
 
@@ -101,7 +101,7 @@ export function generateThemeToggle(): void {
 
 import * as React from "react"
 import { Moon, Sun } from "lucide-react"
-import { useTheme } from "./theme-provider" // Use the local hook
+import { useTheme } from "@/context/themeContext" // Use the local hook
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,

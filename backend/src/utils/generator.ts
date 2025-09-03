@@ -18,9 +18,10 @@ import { generateListPage } from "./generators/listPageGenerator";
 import { generateDashboard } from "./generators/dashboardGenerator";
 import { generateIndexCss } from "./generators/indexCssGenerator";
 import { generateLogin } from "./generators/loginGenerator";
-
 import { generateI18n } from "./generators/i18Generator";
 import { generateLanguageSwitcher } from "./generators/languageSwitcherGenerator";
+import { generateReduxSetup } from "./generators/reduxSetupGenerator";
+import { generateAuthContextSetup } from "./generators/authContextGenerator";
 
 // UPDATED: Import new theme and main.tsx generators
 import {
@@ -55,6 +56,10 @@ router.post("/generate", upload.single("file"), async (req, res) => {
     console.log("Generating i18n setup...");
     generateI18n(modelNames); 
     generateLanguageSwitcher()
+
+    console.log("Generating Redux Store...");
+    generateReduxSetup(models);
+    generateAuthContextSetup();
 
     console.log("Generating Login pages...");
     generateLogin();

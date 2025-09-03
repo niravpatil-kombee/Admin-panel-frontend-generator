@@ -32,14 +32,13 @@ export function generateAppRoutes(models: Record<string, ModelConfig>): void {
     .map(([modelName, config]) => {
       const capitalizedName = capitalize(modelName);
       const lower = modelName.toLowerCase();
-      const plural = `${lower}s`;
 
       if (config.isPopup) {
         // Popup models: Only listing route (forms handled in drawers)
         return `
         // ${capitalizedName} - Popup Forms (Drawer-based)
         {
-          path: "/${plural}",
+          path: "/${lower}",
           element: <${capitalizedName}DataTable />
         }`;
       } else {
@@ -47,7 +46,7 @@ export function generateAppRoutes(models: Record<string, ModelConfig>): void {
         return `
         // ${capitalizedName} - Page Forms (Route-based)
         {
-          path: "/${plural}",
+          path: "/${lower}",
           element: <${capitalizedName}DataTable />
         },
         {
